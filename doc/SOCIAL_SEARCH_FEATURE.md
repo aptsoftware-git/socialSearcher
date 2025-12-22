@@ -62,8 +62,8 @@ New settings added:
 
 **Environment Variables** (`.env` file):
 ```bash
-GOOGLE_CSE_API_KEY=AIzaSyCr0h6TbSn-LbLje1cUEj9es7fQdZekOhY
-GOOGLE_CSE_ID=your_search_engine_id_here
+GOOGLE_CSE_API_KEY="Your_Google_CSE_API_Key_Here"
+GOOGLE_CSE_ID="Your_Google_CSE_ID_Here"
 ```
 
 ### Frontend Components
@@ -117,8 +117,8 @@ async socialSearch(
 3. **Configure Backend**:
    Edit `backend/.env`:
    ```bash
-   GOOGLE_CSE_API_KEY=AIzaSyCr0h6TbSn-LbLje1cUEj9es7fQdZekOhY
-   GOOGLE_CSE_ID=your_actual_search_engine_id
+   GOOGLE_CSE_API_KEY="Your_Google_CSE_API_Key_Here"
+   GOOGLE_CSE_ID="Your_Google_CSE_ID_Here"
    ```
 
 ### 2. Install Dependencies
