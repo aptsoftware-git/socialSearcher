@@ -423,7 +423,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
             {otherResults.length > 0 && `, ${otherResults.length} Other`})
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            These results are from social media platforms via Google Custom Search. Click on any link to view the original post.
+            These results are from social media platforms. Click on any link to view the original post.
           </Alert>
         </Box>
 
