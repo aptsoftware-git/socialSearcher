@@ -4,7 +4,8 @@ import SearchForm from './components/SearchForm';
 import EventList from './components/EventList';
 import ProgressBar from './components/ProgressBar';
 import LLMConfigDropdown from './components/LLMConfigDropdown';
-import { EventData, ProgressUpdate } from './types/events';
+import SocialResultsPanel from './components/SocialResultsPanel';
+import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import logoImage from './assets/logo.png';
 import './App.css';
@@ -25,6 +26,9 @@ function App() {
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [searchSummary, setSearchSummary] = useState<{ message: string; total_events: number } | null>(null);
+  const [socialResults, setSocialResults] = useState<SocialSearchResult[]>([]);
+  const [socialSearchQuery, setSocialSearchQuery] = useState<string>('');
+  const [socialSearchSites, setSocialSearchSites] = useState<string[]>([]);
 
   const handleSearchStart = () => {
     // Reset state
@@ -32,6 +36,15 @@ function App() {
     setProgress(null);
     setSearchSummary(null);
     setIsStreaming(true);
+    setSocialResults([]);
+    setSocialSearchQuery('');
+    setSocialSearchSites([]);
+  };
+
+  const handleSocialSearchResults = (results: SocialSearchResult[], query: string, sites: string[]) => {
+    setSocialResults(results);
+    setSocialSearchQuery(query);
+    setSocialSearchSites(sites);
   };
 
   const handleProgress = (progressUpdate: ProgressUpdate) => {
@@ -65,9 +78,7 @@ function App() {
         // Reset SearchForm state
         handleSearchComplete({
           message: `Search cancelled. ${events.length} event(s) extracted.`,
-          total_events: events.length,
-          articles_processed: 0,
-          processing_time: 0
+          total_events: events.length
         });
       } catch (error) {
         console.error('Cancel error:', error);
@@ -75,9 +86,7 @@ function App() {
         setProgress(null);
         handleSearchComplete({
           message: `Search cancelled. ${events.length} event(s) extracted.`,
-          total_events: events.length,
-          articles_processed: 0,
-          processing_time: 0
+          total_events: events.length
         });
       }
     }
@@ -113,8 +122,20 @@ function App() {
               onEventReceived={handleEventReceived}
               onSearchComplete={handleSearchComplete}
               onError={handleError}
+              onSocialResults={handleSocialSearchResults}
             />
           </Container>
+
+          {/* Social Results Panel */}
+          {socialResults.length > 0 && (
+            <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 } }}>
+              <SocialResultsPanel 
+                results={socialResults}
+                query={socialSearchQuery}
+                sites={socialSearchSites}
+              />
+            </Container>
+          )}
 
           {/* Progress Bar */}
           {isStreaming && progress && (

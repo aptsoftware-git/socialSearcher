@@ -4,11 +4,13 @@ Main FastAPI application entry point.
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from datetime import datetime, timedelta
+from typing import List
 from loguru import logger
 import json
 import asyncio
+import httpx
 
 from app.settings import settings
 from app.utils.logger import setup_logging
@@ -18,6 +20,7 @@ from app.services.config_manager import config_manager
 from app.services.event_extractor import event_extractor
 from app.services.search_service import search_service
 from app.services.excel_exporter import excel_exporter
+from app.services.social_search_service import social_search_service
 from app.models import (
     SourcesListResponse,
     ArticleContent,
@@ -25,7 +28,9 @@ from app.models import (
     ExtractedEntities,
     SearchQuery,
     SearchResponse,
-    SearchStatus
+    SearchStatus,
+    SocialSearchRequest,
+    SocialSearchResponse
 )
 
 # Setup logging
@@ -292,6 +297,141 @@ async def get_sources(enabled_only: bool = True):
     except Exception as e:
         logger.error(f"Error retrieving sources: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve sources: {str(e)}")
+
+
+# Social Search Endpoint
+
+@app.post("/api/v1/social-search", response_model=SocialSearchResponse)
+async def social_search(request: SocialSearchRequest):
+    """
+    Search social media platforms using Google Custom Search Engine.
+    
+    This endpoint uses Google's Custom Search API to search across
+    configured social media platforms like Facebook, Twitter/X, etc.
+    
+    Args:
+        request: SocialSearchRequest with query, sites, and results_per_site
+    
+    Returns:
+        SocialSearchResponse with search results
+    
+    Example:
+        ```
+        POST /api/v1/social-search
+        {
+            "query": "cybersecurity breach 2025",
+            "sites": ["facebook.com", "x.com"],
+            "results_per_site": 10
+        }
+        ```
+    """
+    try:
+        logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['facebook.com', 'x.com']}")
+        
+        # Execute social search
+        results = await social_search_service.search(
+            query=request.query,
+            sites=request.sites,
+            results_per_site=request.results_per_site
+        )
+        
+        return SocialSearchResponse(
+            status="success",
+            query=request.query,
+            sites=request.sites or ['facebook.com', 'x.com'],
+            total_results=len(results),
+            results=results
+        )
+        
+    except Exception as e:
+        logger.error(f"Social search endpoint failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Social search failed: {str(e)}"
+        )
+
+
+# Image Proxy Endpoint (for CORS bypass)
+
+@app.get("/api/v1/proxy-image")
+async def proxy_image(url: str):
+    """
+    Proxy images from social media platforms to bypass CORS restrictions.
+    
+    This endpoint fetches images from external sources (like Facebook CDN)
+    and serves them through our backend, avoiding CORS policy issues.
+    
+    Args:
+        url: The image URL to proxy
+    
+    Returns:
+        Image content with appropriate headers
+    
+    Example:
+        GET /api/v1/proxy-image?url=https://external.xx.fbcdn.net/...
+    """
+    try:
+        logger.debug(f"Proxying image: {url}")
+        
+        # Validate URL to prevent abuse
+        allowed_domains = [
+            'fbcdn.net',           # Facebook CDN
+            'twimg.com',           # Twitter images
+            'cdninstagram.com',    # Instagram CDN
+            'ytimg.com',           # YouTube thumbnails
+            'googleusercontent.com' # Google cached images
+        ]
+        
+        # Check if URL is from an allowed domain
+        if not any(domain in url.lower() for domain in allowed_domains):
+            logger.warning(f"Attempted to proxy image from unauthorized domain: {url}")
+            raise HTTPException(
+                status_code=403,
+                detail="Image domain not allowed"
+            )
+        
+        # Fetch the image
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                url,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Referer': 'https://www.google.com/'
+                }
+            )
+            response.raise_for_status()
+            
+            # Determine content type
+            content_type = response.headers.get('content-type', 'image/jpeg')
+            
+            # Return image with CORS headers
+            return Response(
+                content=response.content,
+                media_type=content_type,
+                headers={
+                    'Cache-Control': 'public, max-age=86400',  # Cache for 24 hours
+                    'Access-Control-Allow-Origin': '*',
+                }
+            )
+            
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error proxying image: {e.response.status_code}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Failed to fetch image: {e.response.status_code}"
+        )
+    except httpx.TimeoutException:
+        logger.error(f"Timeout proxying image: {url}")
+        raise HTTPException(
+            status_code=504,
+            detail="Image fetch timeout"
+        )
+    except Exception as e:
+        logger.error(f"Error proxying image: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to proxy image: {str(e)}"
+        )
 
 
 # Search Endpoint

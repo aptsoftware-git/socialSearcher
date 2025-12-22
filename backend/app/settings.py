@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     export_max_rows: int = 1000
     export_temp_dir: str = "temp"
     
+    # Google Custom Search Engine (for Social Media Search)
+    google_cse_api_key: str = ""  # Set via GOOGLE_CSE_API_KEY in .env
+    google_cse_id: str = ""  # Set via GOOGLE_CSE_ID in .env
+    
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""
