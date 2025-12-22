@@ -192,7 +192,7 @@ Found X results for "query" (Y Facebook, Z Twitter/X, A YouTube, B Instagram)
 
 ### Backend Configuration (.env)
 ```env
-GOOGLE_CSE_API_KEY=AIzaSyCr0h6TbSn-LbLje1cUEj9es7fQdZekOhY
+GOOGLE_CSE_API_KEY=your_api_key_here
 GOOGLE_CSE_ID=your_search_engine_id
 ```
 

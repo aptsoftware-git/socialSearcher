@@ -19,8 +19,8 @@ Edit `backend/.env` and add your Search Engine ID:
 
 ```bash
 # ===== Google Custom Search Engine (Social Media Search) =====
-GOOGLE_CSE_API_KEY=AIzaSyCr0h6TbSn-LbLje1cUEj9es7fQdZekOhY
-GOOGLE_CSE_ID=YOUR_SEARCH_ENGINE_ID_HERE    # <- Replace this!
+GOOGLE_CSE_API_KEY="Your_Google_CSE_API_Key_Here"        # <- Replace this!
+GOOGLE_CSE_ID="Your_Google_CSE_ID_Here"    # <- Replace this!
 ```
 
 ### 3. Restart Backend
