@@ -323,3 +323,30 @@ class ExportRequest(BaseModel):
     """Request to export events to Excel."""
     event_ids: List[str] = Field(..., min_length=1, description="List of event IDs to export")
     session_id: UUID = Field(..., description="Session ID from search response")
+
+
+class SocialSearchRequest(BaseModel):
+    """Request for social media search using Google Custom Search."""
+    query: str = Field(..., description="Search query string")
+    sites: Optional[List[str]] = Field(None, description="List of sites to search (e.g., ['facebook.com', 'x.com'])")
+    results_per_site: int = Field(10, ge=1, le=100, description="Number of results to fetch per site")
+
+
+class SocialSearchResult(BaseModel):
+    """Individual search result from Google Custom Search."""
+    title: str
+    link: str
+    snippet: str
+    display_link: str
+    formatted_url: str
+    source_site: str
+    pagemap: Optional[Dict[str, Any]] = None
+
+
+class SocialSearchResponse(BaseModel):
+    """Response from social media search."""
+    status: str
+    query: str
+    sites: List[str]
+    total_results: int
+    results: List[SocialSearchResult]

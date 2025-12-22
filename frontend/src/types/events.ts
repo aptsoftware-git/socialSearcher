@@ -105,6 +105,7 @@ export interface SearchQuery {
   event_type?: EventType;
   date_from?: string;
   date_to?: string;
+  use_social_search?: boolean;  // Flag to enable social media search
 }
 
 export interface SearchResponse {
@@ -147,6 +148,25 @@ export interface StreamEvent {
   event_type: 'session' | 'progress' | 'event' | 'complete' | 'cancelled' | 'error';
   session_id?: string;
   data?: ProgressUpdate | EventData | { message: string; total_events?: number; articles_processed?: number; processing_time?: number };
+}
+
+// Social Search Types
+export interface SocialSearchResult {
+  title: string;
+  link: string;
+  snippet: string;
+  display_link: string;
+  formatted_url: string;
+  source_site: string;
+  pagemap?: Record<string, unknown>;
+}
+
+export interface SocialSearchResponse {
+  status: string;
+  query: string;
+  sites: string[];
+  total_results: number;
+  results: SocialSearchResult[];
 }
 
 export interface StreamCallbacks {

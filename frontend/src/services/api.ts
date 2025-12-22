@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { SearchQuery, SearchResponse, SessionResponse, EventData } from '../types/events';
+import { SearchQuery, SearchResponse, SessionResponse, EventData, SocialSearchResponse } from '../types/events';
 
 /**
  * API Service for communicating with the backend
@@ -54,6 +54,18 @@ class ApiService {
    */
   async getSession(sessionId: string): Promise<SessionResponse> {
     const response = await this.client.get<SessionResponse>(`/api/v1/search/session/${sessionId}`);
+    return response.data;
+  }
+
+  /**
+   * Search social media platforms using Google Custom Search
+   */
+  async socialSearch(query: string, sites?: string[], resultsPerSite?: number): Promise<SocialSearchResponse> {
+    const response = await this.client.post<SocialSearchResponse>('/api/v1/social-search', {
+      query: query,
+      sites: sites,
+      results_per_site: resultsPerSite || 10
+    });
     return response.data;
   }
 

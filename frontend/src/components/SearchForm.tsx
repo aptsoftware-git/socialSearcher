@@ -10,9 +10,11 @@ import {
   CircularProgress,
   Alert,
   ListSubheader,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
-import { EventType, SearchQuery, ProgressUpdate, EventData } from '../types/events';
+import { EventType, SearchQuery, ProgressUpdate, EventData, SocialSearchResult } from '../types/events';
 
 interface SearchFormProps {
   onSearchStart?: () => void;
@@ -20,6 +22,7 @@ interface SearchFormProps {
   onEventReceived?: (event: EventData) => void;
   onSearchComplete?: (summary: { message: string; total_events: number }) => void;
   onError?: (error: string) => void;
+  onSocialResults?: (results: SocialSearchResult[], query: string, sites: string[]) => void;
 }
 
 // Helper function to get user-friendly event type labels
@@ -111,7 +114,8 @@ const SearchForm: React.FC<SearchFormProps> = ({
   onProgress, 
   onEventReceived, 
   onSearchComplete,
-  onError 
+  onError,
+  onSocialResults
 }) => {
   const [formData, setFormData] = useState<SearchQuery>({
     phrase: '',
@@ -119,6 +123,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
     event_type: undefined,
     date_from: '',
     date_to: '',
+    use_social_search: true,  // Default enabled
   });
 
   const [loading, setLoading] = useState(false);
@@ -160,10 +165,52 @@ const SearchForm: React.FC<SearchFormProps> = ({
         onSearchStart();
       }
 
-      // Import streaming service
+      // If social search is enabled, ONLY call social search (for testing)
+      if (formData.use_social_search) {
+        try {
+          const { apiService } = await import('../services/api');
+          console.log('🔍 Starting social search for:', formData.phrase);
+          
+          const socialResults = await apiService.socialSearch(formData.phrase);
+          console.log('✅ Social search completed!');
+          console.log('📊 Total results:', socialResults.total_results);
+          console.log('🌐 Sites searched:', socialResults.sites);
+          console.log('📝 Results:', socialResults.results);
+          
+          // Pass results to parent component for display
+          if (onSocialResults) {
+            onSocialResults(socialResults.results, socialResults.query, socialResults.sites);
+          }
+          
+          // Show completion message
+          setLoading(false);
+          if (onSearchComplete) {
+            onSearchComplete({
+              message: `Social search completed. Found ${socialResults.total_results} results from ${socialResults.sites.join(', ')}`,
+              total_events: socialResults.total_results,
+            });
+          }
+          
+          // Exit early - don't run regular search
+          return;
+          
+        } catch (socialError) {
+          console.error('❌ Social search failed:', socialError);
+          setLoading(false);
+          const errorMessage = socialError instanceof Error ? socialError.message : 'Social search failed';
+          setError(errorMessage);
+          if (onError) {
+            onError(errorMessage);
+          }
+          return;
+        }
+      }
+
+      // Only run regular streaming search if social search is disabled
+      console.log('🔍 Starting regular streaming search...');
       const { streamService } = await import('../services/streamService');
       
-      // Start streaming search
+      // Start streaming search (regular search)
       streamService.startStreaming(formData, {
         onProgress: (progress) => {
           if (onProgress) {
@@ -213,6 +260,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
       event_type: undefined,
       date_from: '',
       date_to: '',
+      use_social_search: true,  // Reset to default enabled
     });
     setError(null);
   };
@@ -310,6 +358,27 @@ const SearchForm: React.FC<SearchFormProps> = ({
               InputLabelProps={{ shrink: true }}
               helperText="Filter events until this date"
             />
+          </Grid>
+
+          {/* Social Search Checkbox */}
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={formData.use_social_search || false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, use_social_search: e.target.checked }))}
+                  disabled={loading}
+                  color="primary"
+                />
+              }
+              label="Use Social Media Search ONLY (Facebook, Twitter/X, YouTube, Instagram) - Testing Mode"
+            />
+            <Typography variant="caption" display="block" color="text.secondary" sx={{ ml: 4, mt: -0.5 }}>
+              When checked: Uses ONLY Google Custom Search (regular search is disabled for testing)
+            </Typography>
+            <Typography variant="caption" display="block" color="warning.main" sx={{ ml: 4, mt: 0.5 }}>
+              ⚠️ Testing Mode: Regular streaming search will be skipped when this is enabled
+            </Typography>
           </Grid>
 
           {/* Action Buttons */}
