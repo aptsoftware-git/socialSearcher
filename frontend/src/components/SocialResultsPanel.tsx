@@ -274,7 +274,9 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     if (needsProxy) {
       console.log('🔄 Using proxy for:', imageUrl);
-      return `/api/v1/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+      // Use full backend URL for proxy
+      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+      return `${backendUrl}/api/v1/proxy-image?url=${encodeURIComponent(imageUrl)}`;
     }
     
     return imageUrl;

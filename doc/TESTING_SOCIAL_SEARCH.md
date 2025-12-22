@@ -155,7 +155,7 @@ When social search runs, you'll see detailed console logs:
 cat backend/.env | grep GOOGLE_CSE
 
 # Should show:
-GOOGLE_CSE_API_KEY=AIzaSyCr0h6TbSn-LbLje1cUEj9es7fQdZekOhY
+GOOGLE_CSE_API_KEY=your_actual_api_key_here
 GOOGLE_CSE_ID=your_search_engine_id_here
 ```
 
