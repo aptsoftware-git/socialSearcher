@@ -320,6 +320,8 @@ cd c:\Anu\APT\apt\defender\scraping\code\backend
 ..\venv\Scripts\activate
 python -m uvicorn app.main:app --reload
 
+#For production
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 # Check Ollama
 ollama list
 curl http://localhost:11434

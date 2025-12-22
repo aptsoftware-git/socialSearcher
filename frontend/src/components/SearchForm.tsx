@@ -371,13 +371,13 @@ const SearchForm: React.FC<SearchFormProps> = ({
                   color="primary"
                 />
               }
-              label="Use Social Media Search ONLY (Facebook, Twitter/X, YouTube, Instagram) - Testing Mode"
+              label="Use Social Media Search ONLY (Facebook, Twitter/X, YouTube, Instagram)"
             />
             <Typography variant="caption" display="block" color="text.secondary" sx={{ ml: 4, mt: -0.5 }}>
-              When checked: Uses ONLY Google Custom Search (regular search is disabled for testing)
+              When checked: Uses ONLY Facebook, Twitter/X, YouTube, Instagram Search (regular search is disabled)
             </Typography>
             <Typography variant="caption" display="block" color="warning.main" sx={{ ml: 4, mt: 0.5 }}>
-              ⚠️ Testing Mode: Regular streaming search will be skipped when this is enabled
+              Regular streaming search will be skipped when this is enabled
             </Typography>
           </Grid>
 
