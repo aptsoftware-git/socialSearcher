@@ -407,6 +407,21 @@ JSON OUTPUT (extract from THIS article):"""
         try:
             logger.info(f"Extracting event from article: {title[:50]}...")
             
+            # Validate content quality before expensive LLM call
+            if content:
+                readable = sum(c.isalnum() or c.isspace() or c in '.,!?;:()-"\'' for c in content[:1000])
+                ratio = readable / min(1000, len(content))
+                if ratio < 0.30:  # Lowered from 0.40 - try to salvage more articles
+                    logger.warning(f"Content quality too low for LLM ({ratio:.1%} readable) - skipping extraction")
+                    logger.debug(f"Sample: {content[:200]!r}")
+                    return None, {}
+                elif ratio < 0.50:  # Lowered from 0.60
+                    logger.warning(f"Content quality marginal ({ratio:.1%} readable) - LLM may struggle")
+                    # Clean corrupted content more aggressively
+                    # Remove null bytes, replacement chars, and control characters
+                    content = ''.join(c for c in content if c.isprintable() or c.isspace())
+                    logger.debug(f"Applied aggressive cleaning - new length: {len(content)} chars")
+            
             # If entities not provided, extract them
             if entities is None and entity_extractor.is_available():
                 entities = entity_extractor.extract_from_article(title, content)
@@ -443,6 +458,11 @@ Return ONLY valid JSON matching the schema provided."""
                 logger.error(f"Invalid parsed data (type: {type(parsed_data)}): {parsed_data}")
                 return None, metadata
             
+            # Check if LLM explicitly indicated no event (some LLMs return error/null indicators)
+            if parsed_data.get("error") or parsed_data.get("no_event"):
+                logger.warning(f"LLM indicated no extractable event: {parsed_data.get('error') or 'no_event=true'}")
+                return None, metadata
+            
             # VALIDATION: Check if extraction makes sense for this article
             event_type_str = parsed_data.get("event_type", "").lower()
             summary = parsed_data.get("summary", "").lower()
@@ -471,6 +491,10 @@ Return ONLY valid JSON matching the schema provided."""
             
             # Extract location components
             location_data = parsed_data.get("location", {})
+            # Ensure location_data is a dict (Claude might return null)
+            if not isinstance(location_data, dict):
+                logger.warning(f"Location data is not a dict (type: {type(location_data)}), using empty dict")
+                location_data = {}
             
             # Handle country - convert list to string if needed (for cross-border events)
             country_value = location_data.get("country")

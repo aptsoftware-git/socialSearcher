@@ -371,10 +371,10 @@ const SearchForm: React.FC<SearchFormProps> = ({
                   color="primary"
                 />
               }
-              label="Use Social Media Search ONLY (Facebook, Twitter/X, YouTube, Instagram)"
+              label="Use Social Media Search ONLY (YouTube, Twitter/X, Facebook, Instagram)"
             />
             <Typography variant="caption" display="block" color="text.secondary" sx={{ ml: 4, mt: -0.5 }}>
-              When checked: Uses ONLY Facebook, Twitter/X, YouTube, Instagram Search (regular search is disabled)
+              When checked: Uses ONLY YouTube, Twitter/X, Facebook, Instagram Search (regular search is disabled)
             </Typography>
             <Typography variant="caption" display="block" color="warning.main" sx={{ ml: 4, mt: 0.5 }}>
               Regular streaming search will be skipped when this is enabled

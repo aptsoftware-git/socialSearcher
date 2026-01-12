@@ -30,12 +30,34 @@ class Settings(BaseSettings):
     log_level: str = "DEBUG"  # Temporarily set to DEBUG for troubleshooting
     log_file: str = "logs/app.log"
     
-    model_config = {
-        "env_file": str(ROOT_DIR / "backend" / ".env"),
-        "env_file_encoding": "utf-8",
-        "case_sensitive": False,
-        "extra": "ignore"
-    }
+    # Google Custom Search Engine (for social media search)
+    google_cse_api_key: str = ""
+    google_cse_id: str = ""
+    
+    # Social Media API Keys
+    youtube_api_key: str = ""
+    facebook_app_id: str = ""
+    facebook_app_secret: str = ""
+    facebook_access_token: str = ""
+    instagram_app_id: str = ""
+    instagram_app_secret: str = ""
+    instagram_access_token: str = ""
+    twitter_api_key: str = ""
+    twitter_api_key_secret: str = ""
+    twitter_bearer_token: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+    
+    # Social Media Search Configuration
+    max_social_search_results: int = 10
+    enable_full_content_fetch: bool = True
+    cache_social_content_hours: int = 24
+    
+    class Config:
+        env_file = str(ROOT_DIR / "backend" / ".env")
+        env_file_encoding = "utf-8"
+        case_sensitive = False
+        extra = "ignore"
 
 
 # Global settings instance

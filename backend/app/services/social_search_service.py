@@ -10,27 +10,38 @@ from app.settings import settings
 
 
 class SocialSearchService:
-    """Service for searching social media platforms using Google Custom Search Engine."""
+    """Service for searching social media platforms using Google Custom Search Engine.
+    
+    This service uses the SOCIAL MEDIA CSE (google_cse_social_id) which is configured
+    to search ONLY social media platforms: YouTube, Twitter/X, Facebook, Instagram.
+    """
     
     def __init__(self):
         """Initialize the social search service."""
         self.api_key = settings.google_cse_api_key if hasattr(settings, 'google_cse_api_key') else None
-        self.search_engine_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
+        # Use the SOCIAL MEDIA CSE ID (not the regular web search CSE)
+        self.search_engine_id = settings.google_cse_social_id if hasattr(settings, 'google_cse_social_id') else None
+        # Fallback to regular CSE if social CSE not configured (backward compatibility)
+        if not self.search_engine_id:
+            self.search_engine_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
+            logger.warning("GOOGLE_CSE_SOCIAL_ID not configured, falling back to GOOGLE_CSE_ID. This may return non-social-media results.")
         self.base_url = "https://www.googleapis.com/customsearch/v1"
+        # Get configurable max results from settings
+        self.max_results_per_site = settings.max_social_search_results if hasattr(settings, 'max_social_search_results') else 10
         
     async def search(
         self,
         query: str,
         sites: Optional[List[str]] = None,
-        results_per_site: int = 10
+        results_per_site: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Search using Google Custom Search Engine.
         
         Args:
             query: Search query string
-            sites: List of sites to search (e.g., ['facebook.com', 'x.com'])
-            results_per_site: Number of results to fetch per site (default: 10)
+            sites: List of sites to search (e.g., ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'])
+            results_per_site: Number of results to fetch per site (default: from config)
             
         Returns:
             List of search results with title, link, snippet, etc.
@@ -39,9 +50,13 @@ class SocialSearchService:
             logger.error("Google CSE API key or Search Engine ID not configured")
             return []
         
+        # Use configured default if not specified
+        if results_per_site is None:
+            results_per_site = self.max_results_per_site
+        
         # Default sites if not provided - includes all configured platforms
         if not sites:
-            sites = ['facebook.com', 'x.com', 'youtube.com', 'instagram.com']
+            sites = ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']
         
         all_results = []
         
@@ -124,7 +139,7 @@ class SocialSearchService:
                         logger.info(f"Title: {item.get('title', '')}")
                         logger.info(f"Link: {item.get('link', '')}")
                         logger.info(f"Pagemap keys: {list(pagemap.keys())}")
-                        logger.info(f"Full pagemap: {json.dumps(pagemap, indent=2)}")
+                        # logger.info(f"Full pagemap: {json.dumps(pagemap, indent=2)}")
                         
                         # Check for image fields
                         if 'cse_image' in pagemap:
