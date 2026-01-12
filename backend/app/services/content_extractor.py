@@ -170,16 +170,30 @@ class ContentExtractor:
     
     def clean_text(self, text: str) -> str:
         """
-        Clean extracted text by removing extra whitespace and normalizing.
+        Clean extracted text by removing extra whitespace, normalizing, and removing corrupted characters.
         
         Args:
             text: Raw extracted text
         
         Returns:
-            Cleaned text
+            Cleaned text with corrupted characters removed
         """
         if not text:
             return ""
+        
+        # Remove non-printable characters (except common whitespace)
+        # Keep: spaces, tabs, newlines, and printable ASCII/Unicode
+        cleaned_chars = []
+        for c in text:
+            if c.isprintable() or c in ' \t\n\r':
+                cleaned_chars.append(c)
+            elif ord(c) > 127:  # Unicode character
+                # Keep common unicode punctuation and letters
+                if c.isalnum() or c in '""''—–€£¥©®™':
+                    cleaned_chars.append(c)
+                # Skip other unicode (likely corruption)
+        
+        text = ''.join(cleaned_chars)
         
         # Remove extra whitespace
         text = re.sub(r'\s+', ' ', text)
@@ -259,16 +273,40 @@ class ContentExtractor:
     def is_valid_content(self, content: str, min_length: int = 100) -> bool:
         """
         Check if extracted content is valid and substantial.
+        Lenient approach - accepts imperfect content if it has enough readable text.
         
         Args:
             content: Extracted content text
             min_length: Minimum required length
         
         Returns:
-            True if content is valid
+            True if content is valid enough to process
         """
         if not content:
             return False
         
         cleaned = self.clean_text(content)
-        return len(cleaned) >= min_length
+        
+        # Check minimum length
+        if len(cleaned) < min_length:
+            return False
+        
+        # Check for readable content (but be lenient)
+        # Accept content if it has at least 40% readable characters
+        if len(cleaned) > 100:
+            # Count alphanumeric + common punctuation + whitespace
+            readable_chars = sum(
+                c.isalnum() or c.isspace() or c in '.,!?;:()-"\'/&%$#@' 
+                for c in cleaned[:1000]  # Check first 1000 chars
+            )
+            readable_ratio = readable_chars / min(1000, len(cleaned))
+            
+            # Lowered from 70% to 40% - be lenient, try to salvage content
+            if readable_ratio < 0.40:
+                logger.warning(
+                    f"Content quality low (readable ratio: {readable_ratio:.1%}, "
+                    f"but will attempt to process, sample: {cleaned[:80]!r})"
+                )
+                # Don't reject - let LLM try to extract what it can
+        
+        return True

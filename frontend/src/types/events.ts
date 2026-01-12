@@ -177,3 +177,79 @@ export interface StreamCallbacks {
   onCancelled?: (summary: { message: string; total_events: number }) => void;
   onError?: (error: string) => void;
 }
+
+// Social Media Full Content Types
+export interface SocialContentAuthor {
+  name: string;
+  username?: string;
+  profile_url?: string;
+  profile_picture?: string;
+  verified: boolean;
+}
+
+export interface SocialContentMedia {
+  type: 'image' | 'video' | 'gif';
+  url: string;
+  thumbnail_url?: string;
+  width?: number;
+  height?: number;
+  duration?: number;
+}
+
+export interface SocialContentEngagement {
+  likes: number;
+  comments: number;
+  shares: number;
+  views: number;
+  retweets?: number;
+  replies?: number;
+}
+
+export interface SocialFullContent {
+  platform: string;
+  content_type: string;
+  url: string;
+  platform_id: string;
+  text?: string;
+  title?: string;
+  description?: string;
+  author: SocialContentAuthor;
+  posted_at: string;
+  fetched_at: string;
+  media: SocialContentMedia[];
+  engagement: SocialContentEngagement;
+  platform_data: Record<string, unknown>;
+  extracted_event?: EventData;
+  cached: boolean;
+  cache_expires_at?: string;
+}
+
+export interface FetchContentRequest {
+  url: string;
+  platform?: string;
+  force_refresh?: boolean;
+}
+
+export interface FetchContentResponse {
+  status: string;
+  content?: SocialFullContent;
+  from_cache: boolean;
+  rate_limit_info?: {
+    remaining?: number;
+    reset_at?: string;
+  };
+  error?: string;
+}
+
+export interface AnalyseContentRequest {
+  content: SocialFullContent;
+  llm_model?: string;
+}
+
+export interface AnalyseContentResponse {
+  status: string;
+  event?: EventData;
+  llm_model_used: string;
+  processing_time: number;
+  error?: string;
+}

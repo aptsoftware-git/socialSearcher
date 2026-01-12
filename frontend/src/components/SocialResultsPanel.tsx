@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -12,16 +12,117 @@ import {
   Tabs,
   Tab,
   Badge,
+  Button,
+  CircularProgress,
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
   Twitter as TwitterIcon,
   Language as WebIcon,
   OpenInNew as OpenInNewIcon,
-  YouTube as YouTubeIcon,
   Instagram as InstagramIcon,
+  Info as InfoIcon,
+  YouTube as YouTubeIcon,
 } from '@mui/icons-material';
-import { SocialSearchResult } from '../types/events';
+import { SocialSearchResult, SocialFullContent } from '../types/events';
+import { apiService } from '../services/api';
+import SocialContentModal from './SocialContentModal';
+
+// Custom hook to fetch image as blob and convert to object URL (avoids ORB blocking)
+function useImageBlobUrl(proxyUrl: string | null): string | null {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!proxyUrl) {
+      setBlobUrl(null);
+      return;
+    }
+
+    console.log('🔄 Fetching blob for:', proxyUrl);
+    
+    let objectUrl: string | null = null;
+
+    // Fetch image as blob with CORS mode
+    fetch(proxyUrl, {
+      method: 'GET',
+      mode: 'cors',
+      credentials: 'same-origin',
+    })
+      .then(response => {
+        console.log('✅ Blob fetch response:', response.status, response.headers.get('content-type'));
+        console.log('📊 Response headers:', {
+          contentType: response.headers.get('content-type'),
+          contentLength: response.headers.get('content-length'),
+          cacheControl: response.headers.get('cache-control'),
+        });
+        if (!response.ok) throw new Error('Failed to fetch image');
+        
+        // Clone the response to read it as text for debugging
+        return response.clone().text().then(text => {
+          console.log('📝 Response preview (first 200 chars):', text.substring(0, 200));
+          return response.blob();
+        });
+      })
+      .then(blob => {
+        console.log('✅ Blob created:', blob.size, 'bytes, type:', blob.type);
+        objectUrl = URL.createObjectURL(blob);
+        console.log('✅ Object URL created:', objectUrl);
+        setBlobUrl(objectUrl);
+      })
+      .catch(error => {
+        console.error('❌ Error fetching image blob:', error);
+        setBlobUrl(null);
+      });
+
+    // Cleanup: revoke object URL when component unmounts or proxyUrl changes
+    return () => {
+      if (objectUrl) {
+        console.log('🧹 Cleaning up blob URL:', objectUrl);
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [proxyUrl]); // Only re-run when proxyUrl changes
+
+  return blobUrl;
+}
+
+// Component to handle proxied image with blob URL
+const ProxiedImage: React.FC<{
+  proxiedImageUrl: string;
+  alt: string;
+}> = ({ proxiedImageUrl, alt }) => {
+  const blobUrl = useImageBlobUrl(proxiedImageUrl);
+  const imgSrc = blobUrl || proxiedImageUrl;
+  
+  console.log('🖼️ ProxiedImage render:', {
+    proxiedImageUrl,
+    blobUrl,
+    using: imgSrc
+  });
+  
+  return (
+    <Box
+      component="img"
+      src={imgSrc}
+      alt={alt}
+      sx={{
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+      }}
+      onLoad={() => {
+        console.log('✅ Image loaded successfully:', imgSrc);
+      }}
+      onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
+        console.error('❌ Image failed to load:', imgSrc);
+        // Hide the entire image container if image fails to load
+        const parent = e.currentTarget.parentElement;
+        if (parent) parent.style.display = 'none';
+      }}
+    />
+  );
+};
+
 
 interface SocialResultsPanelProps {
   results: SocialSearchResult[];
@@ -57,6 +158,10 @@ function TabPanel(props: TabPanelProps) {
 
 const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query }) => {
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedContent, setSelectedContent] = useState<SocialFullContent | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [loadingContent, setLoadingContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
 
   if (!results || results.length === 0) {
     return null;
@@ -91,6 +196,54 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+  };
+
+  // Detect platform from URL
+  const detectPlatform = (url: string, sourceSite: string): string => {
+    const urlLower = url.toLowerCase();
+    const siteLower = sourceSite.toLowerCase();
+    
+    if (urlLower.includes('facebook.com') || siteLower.includes('facebook')) return 'facebook';
+    if (urlLower.includes('twitter.com') || urlLower.includes('x.com') || siteLower.includes('twitter') || siteLower.includes('x.com')) return 'twitter';
+    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || siteLower.includes('youtube')) return 'youtube';
+    if (urlLower.includes('instagram.com') || siteLower.includes('instagram')) return 'instagram';
+    
+    return 'other';
+  };
+
+  // Handle View Details button click
+  const handleViewDetails = async (result: SocialSearchResult) => {
+    const platform = detectPlatform(result.link, result.source_site);
+    
+    setLoadingContent(result.link);
+    setContentError(null);
+    
+    try {
+      const response = await apiService.fetchSocialContent({
+        url: result.link,
+        platform: platform,
+        force_refresh: false,
+      });
+      
+      if (response.status === 'success' && response.content) {
+        setSelectedContent(response.content);
+        setModalOpen(true);
+      } else {
+        setContentError(response.error || 'Failed to fetch content');
+      }
+    } catch (error) {
+      console.error('Error fetching content:', error);
+      setContentError(error instanceof Error ? error.message : 'Failed to fetch content');
+    } finally {
+      setLoadingContent(null);
+    }
+  };
+
+  // Handle modal close
+  const handleCloseModal = () => {
+    setModalOpen(false);
+    setSelectedContent(null);
+    setContentError(null);
   };
 
   // Get icon for site
@@ -176,7 +329,74 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       return null;
     };
     
-    // 1. Check cse_image (most common)
+    // For Facebook, prefer og:image over cse_image (lookaside URLs are often low quality)
+    if (result.source_site.includes('facebook') && pagemap['metatags']) {
+      console.log('🔍 Facebook result - checking og:image first');
+      const metatags = pagemap['metatags'];
+      
+      if (Array.isArray(metatags) && metatags.length > 0) {
+        const meta = metatags[0] as Record<string, unknown>;
+        
+        // Try og:image first for Facebook (usually better quality than lookaside)
+        if (meta['og:image']) {
+          const imageUrl = tryGetImageUrl(meta['og:image']);
+          // Only use og:image if it's NOT a lookaside URL (those return HTML redirects)
+          if (imageUrl && !imageUrl.includes('lookaside')) {
+            console.log('✅ Using Facebook og:image (high quality):', imageUrl);
+            return imageUrl;
+          } else if (imageUrl && imageUrl.includes('lookaside')) {
+            console.log('⚠️ og:image is lookaside URL (returns HTML), will try cse_thumbnail instead');
+          }
+        }
+      }
+    }
+    
+    // For Facebook, prefer cse_thumbnail (Google's cached version) over cse_image (lookaside)
+    if (result.source_site.includes('facebook') && pagemap['cse_thumbnail']) {
+      console.log('🔍 Facebook - trying cse_thumbnail (Google CDN)');
+      const imageUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
+      if (imageUrl) {
+        console.log('✅ Using Facebook cse_thumbnail (Google CDN):', imageUrl);
+        return imageUrl;
+      }
+    }
+    
+    // For Instagram, SKIP lookaside URLs (they return HTML like Facebook)
+    // Instagram lookaside URLs: https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=...
+    if (result.source_site.includes('instagram')) {
+      console.log('🔍 Instagram result - checking for lookaside URLs');
+      
+      // Check if cse_image is a lookaside URL
+      if (pagemap['cse_image']) {
+        const imageUrl = tryGetImageUrl(pagemap['cse_image']);
+        if (imageUrl && imageUrl.includes('lookaside.instagram.com')) {
+          console.log('⚠️ Instagram cse_image is lookaside URL (returns HTML), will use cse_thumbnail instead');
+          // Skip lookaside, try cse_thumbnail
+          if (pagemap['cse_thumbnail']) {
+            const thumbnailUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
+            if (thumbnailUrl) {
+              console.log('✅ Using Instagram cse_thumbnail (Google CDN):', thumbnailUrl);
+              return thumbnailUrl;
+            }
+          }
+        } else if (imageUrl && !imageUrl.includes('lookaside')) {
+          // Not a lookaside URL, try to use it (might be direct cdninstagram.com, but might get 403)
+          console.log('✅ Using Instagram cse_image (non-lookaside):', imageUrl);
+          return imageUrl;
+        }
+      }
+      
+      // If we get here and have cse_thumbnail, use it
+      if (pagemap['cse_thumbnail']) {
+        const thumbnailUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
+        if (thumbnailUrl) {
+          console.log('✅ Using Instagram cse_thumbnail (Google CDN fallback):', thumbnailUrl);
+          return thumbnailUrl;
+        }
+      }
+    }
+    
+    // 1. Check cse_image (most common - for non-Instagram/Facebook)
     if (pagemap['cse_image']) {
       console.log('✓ Found cse_image field:', pagemap['cse_image']);
       const imageUrl = tryGetImageUrl(pagemap['cse_image']);
@@ -270,7 +490,11 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     const needsProxy = sourceSite.includes('facebook') || 
                       sourceSite.includes('instagram') ||
                       imageUrl.includes('fbcdn.net') ||
-                      imageUrl.includes('cdninstagram.com');
+                      imageUrl.includes('fbsbx.com') ||  // Facebook lookaside CDN
+                      imageUrl.includes('cdninstagram.com') ||
+                      imageUrl.includes('lookaside.instagram.com') ||  // Instagram lookaside
+                      imageUrl.includes('scontent') ||  // Instagram content CDN
+                      imageUrl.includes('instagram.com');
     
     if (needsProxy) {
       console.log('🔄 Using proxy for:', imageUrl);
@@ -318,20 +542,9 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   bgcolor: 'grey.100',
                 }}
               >
-                <Box
-                  component="img"
-                  src={proxiedImageUrl}
+                <ProxiedImage 
+                  proxiedImageUrl={proxiedImageUrl}
                   alt={result.title}
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                  }}
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    // Hide the entire image container if image fails to load
-                    const parent = e.currentTarget.parentElement;
-                    if (parent) parent.style.display = 'none';
-                  }}
                 />
               </Box>
             )}
@@ -399,10 +612,24 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                   lineHeight: 1.5,
+                  mb: 1,
                 }}
               >
                 {result.snippet}
               </Typography>
+
+              {/* View Details Button */}
+              <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={loadingContent === result.link ? <CircularProgress size={16} /> : <InfoIcon />}
+                  onClick={() => handleViewDetails(result)}
+                  disabled={loadingContent === result.link}
+                >
+                  {loadingContent === result.link ? 'Loading...' : 'View Full Content'}
+                </Button>
+              </Box>
             </Box>
           </Box>
         </CardContent>
@@ -420,8 +647,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Found <strong>{results.length}</strong> results for "<strong>{query}</strong>"
-            {' '}({facebookResults.length} Facebook, {twitterResults.length} Twitter/X, 
-            {youtubeResults.length} YouTube, {instagramResults.length} Instagram
+            {' '}({youtubeResults.length} YouTube, {twitterResults.length} Twitter/X, 
+            {facebookResults.length} Facebook, {instagramResults.length} Instagram
             {otherResults.length > 0 && `, ${otherResults.length} Other`})
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
@@ -439,8 +666,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
             scrollButtons="auto"
           >
             <Tab 
-              icon={<Badge badgeContent={facebookResults.length} color="primary"><FacebookIcon /></Badge>}
-              label="Facebook" 
+              icon={<Badge badgeContent={youtubeResults.length} color="error"><YouTubeIcon /></Badge>}
+              label="YouTube" 
               id="social-tab-0"
               aria-controls="social-tabpanel-0"
               sx={{ fontWeight: 600 }}
@@ -453,8 +680,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
               sx={{ fontWeight: 600 }}
             />
             <Tab 
-              icon={<Badge badgeContent={youtubeResults.length} color="error"><YouTubeIcon /></Badge>}
-              label="YouTube" 
+              icon={<Badge badgeContent={facebookResults.length} color="primary"><FacebookIcon /></Badge>}
+              label="Facebook" 
               id="social-tab-2"
               aria-controls="social-tabpanel-2"
               sx={{ fontWeight: 600 }}
@@ -478,17 +705,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           </Tabs>
         </Box>
 
-        {/* Facebook Tab */}
+        {/* YouTube Tab */}
         <TabPanel value={activeTab} index={0}>
-          {facebookResults.length > 0 ? (
+          {youtubeResults.length > 0 ? (
             <Stack spacing={2}>
-              {facebookResults.map((result, index) => 
-                renderResultCard(result, index, facebookResults.length)
+              {youtubeResults.map((result, index) => 
+                renderResultCard(result, index, youtubeResults.length)
               )}
             </Stack>
           ) : (
             <Alert severity="info">
-              No Facebook results found for this query.
+              No YouTube results found for this query.
             </Alert>
           )}
         </TabPanel>
@@ -508,17 +735,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           )}
         </TabPanel>
 
-        {/* YouTube Tab */}
+        {/* Facebook Tab */}
         <TabPanel value={activeTab} index={2}>
-          {youtubeResults.length > 0 ? (
+          {facebookResults.length > 0 ? (
             <Stack spacing={2}>
-              {youtubeResults.map((result, index) => 
-                renderResultCard(result, index, youtubeResults.length)
+              {facebookResults.map((result, index) => 
+                renderResultCard(result, index, facebookResults.length)
               )}
             </Stack>
           ) : (
             <Alert severity="info">
-              No YouTube results found for this query.
+              No Facebook results found for this query.
             </Alert>
           )}
         </TabPanel>
@@ -552,10 +779,37 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* Footer */}
         <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="caption" color="text.secondary" align="center" display="block">
-            💡 Tip: Switch tabs to see results from different platforms. Click any link to view the full content.
+            💡 Tip: Switch tabs to see results from different platforms. Click "View Full Content" to see detailed information and analyse with AI.
           </Typography>
         </Box>
       </Paper>
+
+      {/* Error Alert */}
+      {contentError && (
+        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setContentError(null)}>
+          {contentError}
+        </Alert>
+      )}
+
+      {/* Social Content Modal */}
+      <SocialContentModal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        content={selectedContent}
+        llmModel={(() => {
+          // Read LLM config from localStorage (same as LLMConfigDropdown)
+          try {
+            const saved = localStorage.getItem('llm_config');
+            if (saved) {
+              const config = JSON.parse(saved);
+              return config.model || 'claude-3-5-haiku-20241022';
+            }
+          } catch (e) {
+            console.error('Failed to read LLM config:', e);
+          }
+          return 'claude-3-5-haiku-20241022'; // Default
+        })()}
+      />
     </Box>
   );
 };

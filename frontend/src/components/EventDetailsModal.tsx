@@ -34,6 +34,16 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ope
     }
   };
 
+  const formatDateOnly = (dateString: string | undefined): string => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = parseISO(dateString);
+      return format(date, 'PPP'); // Format without time (e.g., "November 21st, 2025")
+    } catch {
+      return dateString;
+    }
+  };
+
   const formatPerpetratorType = (type: string | undefined): string => {
     if (!type) return '';
     // Convert snake_case to Title Case
@@ -73,10 +83,16 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ope
       <DialogContent dividers>
         <Table size="small">
           <TableBody>
-            {/* Event Time */}
+            {/* Event Date - MOVED TO TOP */}
+            <TableRow>
+              <TableCell sx={{ fontWeight: 'bold', width: '35%' }}>Event Date</TableCell>
+              <TableCell>{formatDateOnly(event.event_date || event.date)}</TableCell>
+            </TableRow>
+
+            {/* Event Time - MOVED TO TOP */}
             {event.event_time && (
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', width: '35%' }}>Event Time</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>Event Time</TableCell>
                 <TableCell>{event.event_time}</TableCell>
               </TableRow>
             )}
@@ -220,12 +236,6 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ope
               </TableRow>
             )}
 
-            {/* Event Date */}
-            <TableRow>
-              <TableCell sx={{ fontWeight: 'bold' }}>Event Date</TableCell>
-              <TableCell>{formatDate(event.event_date || event.date)}</TableCell>
-            </TableRow>
-
             {/* Extraction Confidence */}
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>Extraction Confidence</TableCell>
@@ -243,28 +253,6 @@ export const EventDetailsModal: React.FC<EventDetailsModalProps> = ({ event, ope
               <TableRow>
                 <TableCell sx={{ fontWeight: 'bold' }}>Collection Timestamp</TableCell>
                 <TableCell>{formatDate(event.collection_timestamp)}</TableCell>
-              </TableRow>
-            )}
-
-            {/* Full Content */}
-            {event.full_content && (
-              <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', verticalAlign: 'top' }}>Full Content</TableCell>
-                <TableCell>
-                  <Box
-                    sx={{
-                      maxHeight: 200,
-                      overflowY: 'auto',
-                      bgcolor: 'grey.50',
-                      p: 1,
-                      borderRadius: 1,
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {event.full_content}
-                    </Typography>
-                  </Box>
-                </TableCell>
               </TableRow>
             )}
           </TableBody>

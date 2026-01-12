@@ -32,13 +32,13 @@ class Settings(BaseSettings):
     
     # Claude API
     claude_api_key: str = ""  # Set via CLAUDE_API_KEY in .env
-    default_claude_model: str = "claude-4.5-haiku"  # Fastest and cheapest
+    default_claude_model: str = "claude-3-5-haiku-20241022"  # Claude 3.5 Haiku - Fast and cost-effective
     claude_max_concurrent: int = 5  # Max concurrent Claude API requests
     claude_timeout: int = 30  # Claude API timeout in seconds
     
     # LLM Provider Selection
-    default_llm_provider: str = "ollama"  # "ollama" or "claude"
-    enable_llm_fallback: bool = True  # Fallback to alternate provider on failure
+    default_llm_provider: str = "claude"  # "claude" or "ollama" - Changed to Claude as primary
+    enable_llm_fallback: bool = True  # Fallback to alternate provider on failure (Claude → Ollama)
     
     # Scraping Limits (Global defaults - can be overridden per source)
     max_search_results: int = 10  # Maximum URL results to extract from search page
@@ -92,9 +92,29 @@ class Settings(BaseSettings):
     export_max_rows: int = 1000
     export_temp_dir: str = "temp"
     
-    # Google Custom Search Engine (for Social Media Search)
-    google_cse_api_key: str = ""  # Set via GOOGLE_CSE_API_KEY in .env
-    google_cse_id: str = ""  # Set via GOOGLE_CSE_ID in .env
+    # Google Custom Search Engine
+    google_cse_api_key: str = ""  # Shared API key for both CSEs - Set via GOOGLE_CSE_API_KEY in .env
+    google_cse_id: str = ""  # CSE #1: Web Search (articles/news, excludes social media) - Set via GOOGLE_CSE_ID in .env
+    google_cse_social_id: str = ""  # CSE #2: Social Media Search ONLY (YouTube, Twitter/X, Facebook, Instagram) - Set via GOOGLE_CSE_SOCIAL_ID in .env
+    
+    # Social Media API Keys
+    youtube_api_key: str = ""  # YouTube Data API v3
+    facebook_app_id: str = ""
+    facebook_app_secret: str = ""
+    facebook_access_token: str = ""
+    instagram_app_id: str = ""
+    instagram_app_secret: str = ""
+    instagram_access_token: str = ""
+    twitter_api_key: str = ""
+    twitter_api_key_secret: str = ""
+    twitter_bearer_token: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+    
+    # Social Media Search Configuration
+    max_social_search_results: int = 10
+    enable_full_content_fetch: bool = True
+    cache_social_content_hours: int = 24
     
     @property
     def cors_origins_list(self) -> List[str]:
@@ -117,7 +137,7 @@ class Settings(BaseSettings):
         return Path(__file__).parent.parent / self.sources_config_path
     
     model_config = {
-        "env_file": ".env",
+        "env_file": ".env",  # Look for .env in backend/ directory (same level as app/)
         "env_file_encoding": "utf-8",
         "case_sensitive": False,
         "extra": "ignore"  # Ignore extra fields in .env
