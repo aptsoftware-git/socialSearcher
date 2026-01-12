@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   CircularProgress,
+  Snackbar,
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
@@ -162,6 +163,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingContent, setLoadingContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
 
   if (!results || results.length === 0) {
     return null;
@@ -217,6 +219,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     setLoadingContent(result.link);
     setContentError(null);
+    setSnackbarOpen(false);
     
     try {
       const response = await apiService.fetchSocialContent({
@@ -229,14 +232,23 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         setSelectedContent(response.content);
         setModalOpen(true);
       } else {
-        setContentError(response.error || 'Failed to fetch content');
+        const errorMsg = response.error || 'Failed to fetch content';
+        setContentError(errorMsg);
+        setSnackbarOpen(true);
       }
     } catch (error) {
       console.error('Error fetching content:', error);
-      setContentError(error instanceof Error ? error.message : 'Failed to fetch content');
+      const errorMsg = error instanceof Error ? error.message : 'Failed to fetch content';
+      setContentError(errorMsg);
+      setSnackbarOpen(true);
     } finally {
       setLoadingContent(null);
     }
+  };
+
+  // Handle snackbar close
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   // Handle modal close
@@ -244,6 +256,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     setModalOpen(false);
     setSelectedContent(null);
     setContentError(null);
+    setSnackbarOpen(false);
   };
 
   // Get icon for site
@@ -784,12 +797,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         </Box>
       </Paper>
 
-      {/* Error Alert */}
-      {contentError && (
-        <Alert severity="error" sx={{ mt: 2 }} onClose={() => setContentError(null)}>
+      {/* Error Snackbar Toast */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="error" sx={{ width: '100%' }}>
           {contentError}
         </Alert>
-      )}
+      </Snackbar>
 
       {/* Social Content Modal */}
       <SocialContentModal
