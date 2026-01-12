@@ -21,6 +21,7 @@ from app.services.event_extractor import event_extractor
 from app.services.search_service import search_service
 from app.services.excel_exporter import excel_exporter
 from app.services.social_search_service import social_search_service
+from app.services.social_content_aggregator import social_content_aggregator
 from app.models import (
     SourcesListResponse,
     ArticleContent,
@@ -30,7 +31,11 @@ from app.models import (
     SearchResponse,
     SearchStatus,
     SocialSearchRequest,
-    SocialSearchResponse
+    SocialSearchResponse,
+    FetchContentRequest,
+    FetchContentResponse,
+    AnalyseContentRequest,
+    AnalyseContentResponse
 )
 
 # Setup logging
@@ -66,6 +71,16 @@ async def startup_event():
     logger.info("Starting Event Scraper API...")
     logger.info(f"Ollama URL: {settings.ollama_url}")
     logger.info(f"Ollama Model: {settings.ollama_model}")
+    
+    # Log social media API configuration status
+    logger.info("=== Social Media API Configuration ===")
+    logger.info(f"YouTube API: {'✓ Configured' if settings.youtube_api_key else '✗ Not configured'}")
+    logger.info(f"Facebook API: {'✓ Configured' if settings.facebook_access_token else '✗ Not configured'}")
+    if settings.facebook_access_token:
+        logger.info(f"  Token: {settings.facebook_access_token[:20]}...")
+    logger.info(f"Twitter API: {'✓ Configured' if settings.twitter_bearer_token else '✗ Not configured'}")
+    logger.info(f"Instagram API: {'✓ Configured' if settings.instagram_access_token else '✗ Not configured'}")
+    logger.info("=======================================")
     
     # Initialize Ollama client
     try:
@@ -307,7 +322,7 @@ async def social_search(request: SocialSearchRequest):
     Search social media platforms using Google Custom Search Engine.
     
     This endpoint uses Google's Custom Search API to search across
-    configured social media platforms like Facebook, Twitter/X, etc.
+    configured social media platforms like YouTube, Twitter/X, Facebook, Instagram, etc.
     
     Args:
         request: SocialSearchRequest with query, sites, and results_per_site
@@ -320,13 +335,13 @@ async def social_search(request: SocialSearchRequest):
         POST /api/v1/social-search
         {
             "query": "cybersecurity breach 2025",
-            "sites": ["facebook.com", "x.com"],
+            "sites": ["youtube.com", "x.com"],
             "results_per_site": 10
         }
         ```
     """
     try:
-        logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['facebook.com', 'x.com']}")
+        logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']}")
         
         # Execute social search
         results = await social_search_service.search(
@@ -338,7 +353,7 @@ async def social_search(request: SocialSearchRequest):
         return SocialSearchResponse(
             status="success",
             query=request.query,
-            sites=request.sites or ['facebook.com', 'x.com'],
+            sites=request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'],
             total_results=len(results),
             results=results
         )
@@ -349,6 +364,234 @@ async def social_search(request: SocialSearchRequest):
             status_code=500,
             detail=f"Social search failed: {str(e)}"
         )
+
+
+# Social Content Fetch Endpoint
+
+@app.post("/api/v1/social-content/fetch", response_model=FetchContentResponse)
+async def fetch_social_content(request: FetchContentRequest):
+    """
+    Fetch full content from a social media post/tweet/video URL.
+    
+    Uses platform-specific APIs (YouTube, Twitter, Facebook, Instagram)
+    to retrieve complete content including text, media, and engagement metrics.
+    
+    Results are cached for 24 hours (configurable) to reduce API calls.
+    
+    Args:
+        request: FetchContentRequest with URL, platform, and force_refresh flag
+    
+    Returns:
+        FetchContentResponse with full social content
+    
+    Example:
+        ```
+        POST /api/v1/social-content/fetch
+        {
+            "url": "https://youtube.com/watch?v=VIDEO_ID",
+            "platform": "youtube",
+            "force_refresh": false
+        }
+        ```
+    """
+    try:
+        logger.info(f"Fetch content request: {request.platform} - {request.url}")
+        
+        # Fetch content using aggregator (with caching)
+        content = await social_content_aggregator.fetch_content(
+            url=request.url,
+            platform=request.platform,
+            force_refresh=request.force_refresh
+        )
+        
+        if not content:
+            return FetchContentResponse(
+                status="error",
+                error="Could not fetch content from the provided URL. Please check the URL and API credentials.",
+                from_cache=False
+            )
+        
+        return FetchContentResponse(
+            status="success",
+            content=content,
+            from_cache=content.cached if hasattr(content, 'cached') else False,
+            rate_limit_remaining=None,  # TODO: Track rate limits
+            rate_limit_reset=None
+        )
+        
+    except Exception as e:
+        logger.error(f"Fetch content endpoint failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch content: {str(e)}"
+        )
+
+
+# Social Content Analysis Endpoint
+
+@app.post("/api/v1/social-content/analyse", response_model=AnalyseContentResponse)
+async def analyse_social_content(request: AnalyseContentRequest):
+    """
+    Analyse social media content and extract event information using LLM.
+    
+    Uses the existing LLM service (Claude/Ollama with fallback) to analyse
+    the full social media content and extract structured event information.
+    
+    Args:
+        request: AnalyseContentRequest with content and optional LLM model
+    
+    Returns:
+        AnalyseContentResponse with extracted event data
+    
+    Example:
+        ```
+        POST /api/v1/social-content/analyse
+        {
+            "content": {...full social content object...},
+            "llm_model": "claude-3-5-haiku-20241022"
+        }
+        ```
+    """
+    try:
+        start_time = datetime.utcnow()
+        logger.info(f"Analysing {request.content.platform} content: {request.content.url}")
+        
+        # Check cache first for existing analysis
+        cached_event = social_content_aggregator.get_cached_analysis(
+            request.content.url,
+            request.llm_model
+        )
+        
+        if cached_event:
+            # Return cached analysis
+            logger.info(f"✅ Returning cached analysis for: {request.content.url}")
+            return AnalyseContentResponse(
+                status="success",
+                event=cached_event,
+                llm_model_used="cached",
+                processing_time_seconds=0.0
+            )
+        
+        # Prepare content for LLM
+        # Combine title (if YouTube), text, and description into analysis text
+        analysis_text = ""
+        if request.content.title:
+            analysis_text += f"Title: {request.content.title}\n\n"
+        if request.content.text:
+            analysis_text += f"{request.content.text}\n\n"
+        if request.content.description and request.content.description != request.content.text:
+            analysis_text += f"Description: {request.content.description}\n\n"
+        
+        # Add context about the post
+        analysis_text += f"\nPosted by: {request.content.author.name}\n"
+        analysis_text += f"Platform: {request.content.platform}\n"
+        analysis_text += f"Posted at: {request.content.posted_at.isoformat()}\n"
+        analysis_text += f"URL: {request.content.url}\n"
+        
+        if not analysis_text.strip():
+            return AnalyseContentResponse(
+                status="error",
+                error="No text content available to analyse"
+            )
+        
+        # Extract event using existing LLM service
+        # Use specified model or default from settings
+        model_to_use = request.llm_model if request.llm_model else None
+        
+        # Auto-detect provider from model name
+        # Claude models start with "claude-", everything else is Ollama
+        provider_to_use = None
+        if model_to_use:
+            if model_to_use.startswith("claude-"):
+                provider_to_use = "claude"
+            else:
+                provider_to_use = "ollama"
+        
+        logger.info(f"Extracting event using LLM provider: {provider_to_use or 'default'}, model: {model_to_use or 'default'}")
+        
+        # Call event_extractor with proper parameters
+        event_tuple = await event_extractor.extract_event(
+            title=request.content.title or f"{request.content.platform.title()} Post",
+            content=analysis_text,
+            url=request.content.url,
+            source_name=request.content.platform.title(),
+            article_published_date=request.content.posted_at,
+            llm_provider=provider_to_use,
+            llm_model=model_to_use
+        )
+        
+        # Extract event and metadata from tuple (returns tuple[EventData, Dict])
+        event = event_tuple[0] if event_tuple else None
+        metadata = event_tuple[1] if event_tuple and len(event_tuple) > 1 else {}
+        
+        if not event:
+            error_msg = metadata.get("error", "Failed to extract event from content")
+            return AnalyseContentResponse(
+                status="error",
+                error=error_msg
+            )
+        
+        # Calculate processing time
+        end_time = datetime.utcnow()
+        processing_time = (end_time - start_time).total_seconds()
+        
+        # Get the model that was actually used from metadata
+        # Format: "provider:model" (e.g., "ollama:qwen2.5:latest" or "claude:claude-3-5-haiku-20241022")
+        llm_model_used = metadata.get("model", model_to_use or "default")
+        provider = metadata.get("provider", "unknown")
+        if provider != "unknown":
+            llm_model_used = f"{provider}:{llm_model_used}"
+        
+        # Cache the successful analysis result
+        social_content_aggregator.save_analysis_to_cache(
+            request.content.url,
+            event,
+            request.llm_model
+        )
+        
+        return AnalyseContentResponse(
+            status="success",
+            event=event,
+            llm_model_used=llm_model_used,
+            processing_time_seconds=processing_time
+        )
+        
+    except Exception as e:
+        logger.error(f"Analyse content endpoint failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyse content: {str(e)}"
+        )
+
+
+# Cache Management Endpoints
+
+@app.get("/api/v1/social-content/cache/stats")
+async def get_cache_stats():
+    """Get cache statistics for social media content."""
+    try:
+        stats = social_content_aggregator.get_cache_stats()
+        return {
+            "status": "success",
+            **stats
+        }
+    except Exception as e:
+        logger.error(f"Get cache stats failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/social-content/cache/clear")
+async def clear_cache(platform: str = None):
+    """Clear cache for specific platform or all platforms."""
+    try:
+        social_content_aggregator.clear_cache(platform)
+        return {
+            "status": "success",
+            "message": f"Cache cleared for {platform if platform else 'all platforms'}"
+        }
+    except Exception as e:
+        logger.error(f"Clear cache failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Image Proxy Endpoint (for CORS bypass)
@@ -376,10 +619,15 @@ async def proxy_image(url: str):
         # Validate URL to prevent abuse
         allowed_domains = [
             'fbcdn.net',           # Facebook CDN
+            'fbsbx.com',           # Facebook external image CDN (lookaside.fbsbx.com)
+            'facebook.com',        # Facebook direct images
             'twimg.com',           # Twitter images
             'cdninstagram.com',    # Instagram CDN
+            'instagram.com',       # Instagram direct images
+            'scontent.cdninstagram.com', # Instagram content CDN
             'ytimg.com',           # YouTube thumbnails
-            'googleusercontent.com' # Google cached images
+            'googleusercontent.com', # Google cached images
+            'gstatic.com'          # Google static content CDN (for encrypted-tbn0.gstatic.com thumbnails)
         ]
         
         # Check if URL is from an allowed domain
@@ -390,27 +638,68 @@ async def proxy_image(url: str):
                 detail="Image domain not allowed"
             )
         
-        # Fetch the image
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                url,
-                headers={
+        # Fetch the image with redirect following
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            # Use different headers for Instagram to avoid anti-bot protection
+            if 'instagram.com' in url.lower():
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Referer': 'https://www.instagram.com/',
+                    'Sec-Fetch-Dest': 'image',
+                    'Sec-Fetch-Mode': 'no-cors',
+                    'Sec-Fetch-Site': 'same-site'
+                }
+            else:
+                headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Referer': 'https://www.google.com/'
                 }
-            )
+            
+            response = await client.get(url, headers=headers)
             response.raise_for_status()
             
-            # Determine content type
+            # Log response details
+            content_length = len(response.content)
+            logger.info(f"Fetched image: {content_length} bytes, status: {response.status_code}, final URL: {response.url}")
+            logger.debug(f"Response headers: {dict(response.headers)}")
+            
+            # If response is suspiciously small, log warning
+            if content_length < 1000:
+                logger.warning(f"Suspiciously small image response: {content_length} bytes from {url}")
+                logger.warning(f"Response content preview: {response.content[:200]}")
+            
+            # Determine content type - force image content type to prevent ORB blocking
             content_type = response.headers.get('content-type', 'image/jpeg')
             
-            # Return image with CORS headers
+            # If content type is generic/octet-stream, try to detect from URL or default to jpeg
+            if 'octet-stream' in content_type or not content_type.startswith('image/'):
+                if url.lower().endswith('.png') or 'png' in url.lower():
+                    content_type = 'image/png'
+                elif url.lower().endswith('.gif') or 'gif' in url.lower():
+                    content_type = 'image/gif'
+                elif url.lower().endswith('.webp') or 'webp' in url.lower():
+                    content_type = 'image/webp'
+                else:
+                    content_type = 'image/jpeg'  # Default to JPEG
+            
+            logger.debug(f"Serving image with content-type: {content_type}")
+            
+            # Return image with comprehensive CORS headers to prevent ORB blocking
             return Response(
                 content=response.content,
                 media_type=content_type,
                 headers={
                     'Cache-Control': 'public, max-age=86400',  # Cache for 24 hours
                     'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+                    'Access-Control-Allow-Headers': '*',
+                    'Access-Control-Expose-Headers': '*',
+                    'Cross-Origin-Resource-Policy': 'cross-origin',  # Critical for ORB
+                    'Cross-Origin-Embedder-Policy': 'unsafe-none',  # Allow embedding
+                    'X-Content-Type-Options': 'nosniff',
+                    'Vary': 'Origin',  # Important for caching with CORS
                 }
             )
             
@@ -432,6 +721,21 @@ async def proxy_image(url: str):
             status_code=500,
             detail=f"Failed to proxy image: {str(e)}"
         )
+
+
+# OPTIONS handler for proxy-image (CORS preflight)
+@app.options("/api/v1/proxy-image")
+async def proxy_image_options():
+    """Handle CORS preflight requests for image proxy."""
+    return Response(
+        status_code=200,
+        headers={
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': '*',
+            'Access-Control-Max-Age': '86400',  # Cache preflight for 24 hours
+        }
+    )
 
 
 # Search Endpoint

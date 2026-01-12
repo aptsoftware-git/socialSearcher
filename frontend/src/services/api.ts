@@ -1,5 +1,15 @@
 import axios, { AxiosInstance } from 'axios';
-import { SearchQuery, SearchResponse, SessionResponse, EventData, SocialSearchResponse } from '../types/events';
+import { 
+  SearchQuery, 
+  SearchResponse, 
+  SessionResponse, 
+  EventData, 
+  SocialSearchResponse,
+  FetchContentRequest,
+  FetchContentResponse,
+  AnalyseContentRequest,
+  AnalyseContentResponse
+} from '../types/events';
 
 /**
  * API Service for communicating with the backend
@@ -105,6 +115,52 @@ class ApiService {
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Fetch full content from social media URL
+   */
+  async fetchSocialContent(request: FetchContentRequest): Promise<FetchContentResponse> {
+    const response = await this.client.post<FetchContentResponse>(
+      '/api/v1/social-content/fetch',
+      request
+    );
+    return response.data;
+  }
+
+  /**
+   * Analyse social content and extract event using LLM
+   */
+  async analyseSocialContent(request: AnalyseContentRequest): Promise<AnalyseContentResponse> {
+    const response = await this.client.post<AnalyseContentResponse>(
+      '/api/v1/social-content/analyse',
+      request
+    );
+    return response.data;
+  }
+
+  /**
+   * Get social content cache statistics
+   */
+  async getSocialContentCacheStats(): Promise<{
+    total_cached: number;
+    active_cached: number;
+    expired_cached: number;
+    platforms: Record<string, number>;
+  }> {
+    const response = await this.client.get('/api/v1/social-content/cache/stats');
+    return response.data;
+  }
+
+  /**
+   * Clear social content cache
+   */
+  async clearSocialContentCache(platform?: string): Promise<{ message: string; cleared: number }> {
+    const url = platform 
+      ? `/api/v1/social-content/cache/clear?platform=${platform}`
+      : '/api/v1/social-content/cache/clear';
+    const response = await this.client.post(url);
+    return response.data;
   }
 }
 

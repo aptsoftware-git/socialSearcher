@@ -8,18 +8,46 @@
 # - Validation: max_search_results must be > 0, and >= max_articles_to_process
 
 sources:
-  # DuckDuckGo (PRIMARY SOURCE - No bot detection, simple HTML)
+  # Google Custom Search (PRIMARY SOURCE - Uses Google Custom Search API)
+  - name: "Google"
+    base_url: "https://www.googleapis.com/customsearch/v1"
+    enabled: true  # ✅ ENABLED for final version
+    search_url_template: "https://www.googleapis.com/customsearch/v1"
+    rate_limit: 1.0
+    # Scraping limits
+    max_search_results: 10       # Extract up to 20 URLs from Google search results
+    max_articles_to_process: 1  # Scrape and process up to 10 articles with LLM
+    api_based: true              # Uses API instead of scraping
+    selectors:
+      # Generic selectors for scraped article pages
+      title: "h1, h2, .article-title, [class*='title'], [class*='heading']"
+      content: "article, .article-content, .content, main p, .article-body, p"
+      date: "time, .date, .published, [datetime]"
+      author: ".author, .byline, [rel='author']"
+    headers:
+      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      Accept-Language: "en-US,en;q=0.9"
+
+  # DuckDuckGo (SECONDARY SOURCE - Uses POST requests for HTML search)
+  # Note: DuckDuckGo HTML search requires POST with form data
+  # Generic POST support has been implemented to support any search engine
   - name: "DuckDuckGo"
     base_url: "https://duckduckgo.com"
-    enabled: true
-    search_url_template: "https://html.duckduckgo.com/html/?q={query}"
+    enabled: true  # ✅ ENABLED for final version
+    search_url_template: "https://html.duckduckgo.com/html/"
     rate_limit: 2.0
+    # HTTP request configuration for POST support
+    request_method: "POST"
+    request_data:
+      q: "{query}"           # Search query placeholder
+      kl: "us-en"            # Language/region filter
     # Scraping limits (optional - if not set, uses global defaults from .env)
-    max_search_results: 20       # Extract up to 5 URLs from search results
-    max_articles_to_process: 20  # Scrape and process up to 5 articles with LLM
+    max_search_results: 10       # Extract up to 10 URLs from search results
+    max_articles_to_process: 1  # Scrape and process up to 10 articles with LLM
     selectors:
-      # DuckDuckGo HTML version has simple structure
-      article_links: ".result__url"
+      # DuckDuckGo HTML returns links with class 'result__a' for search results
+      article_links: "a.result__a"
       title: "h1, h2, .article-title, [class*='title'], [class*='heading']"
       content: "article, .article-content, .content, main p, .article-body, p"
       date: "time, .date, .published, [class*='date'], [datetime]"

@@ -220,10 +220,15 @@ class SourceConfig(BaseModel):
     name: str
     base_url: str
     enabled: bool = True
+    api_based: bool = Field(default=False, description="Whether this source uses an API instead of HTML scraping")
     search_url_template: Optional[str] = None  # URL template with {query} placeholder
     rate_limit: float = Field(default=1.0, ge=0.1, description="Minimum seconds between requests")
     selectors: Dict[str, str] = Field(default_factory=dict)
     headers: Dict[str, str] = Field(default_factory=dict)
+    
+    # HTTP request configuration (for generic search engine support)
+    request_method: str = Field(default="GET", description="HTTP method to use (GET or POST)")
+    request_data: Optional[Dict[str, str]] = Field(None, description="Form data for POST requests (supports {query} placeholder)")
     
     # Scraping limits (optional - if not set, global defaults are used)
     max_search_results: Optional[int] = Field(None, description="Maximum URL results to extract from search (overrides global)")
@@ -328,7 +333,7 @@ class ExportRequest(BaseModel):
 class SocialSearchRequest(BaseModel):
     """Request for social media search using Google Custom Search."""
     query: str = Field(..., description="Search query string")
-    sites: Optional[List[str]] = Field(None, description="List of sites to search (e.g., ['facebook.com', 'x.com'])")
+    sites: Optional[List[str]] = Field(None, description="List of sites to search (e.g., ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'])")
     results_per_site: int = Field(10, ge=1, le=100, description="Number of results to fetch per site")
 
 
@@ -350,3 +355,108 @@ class SocialSearchResponse(BaseModel):
     sites: List[str]
     total_results: int
     results: List[SocialSearchResult]
+
+
+# ===== Social Media Full Content Models =====
+
+class SocialContentAuthor(BaseModel):
+    """Author/creator information for social media content."""
+    name: str
+    username: Optional[str] = None
+    profile_url: Optional[str] = None
+    profile_picture: Optional[str] = None
+    verified: bool = False
+
+
+class SocialContentMedia(BaseModel):
+    """Media attachments (images, videos) for social content."""
+    type: str  # "image", "video", "gif"
+    url: str
+    thumbnail_url: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    duration: Optional[int] = None  # For videos, in seconds
+
+
+class SocialContentEngagement(BaseModel):
+    """Engagement metrics for social content."""
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+    views: int = 0
+    retweets: int = 0  # Twitter specific
+    replies: int = 0   # Twitter specific
+
+
+class SocialFullContent(BaseModel):
+    """Full content fetched from social media platform APIs."""
+    # Identification
+    platform: str  # "facebook", "twitter", "youtube", "instagram"
+    content_type: str  # "post", "tweet", "video", "story"
+    url: str
+    platform_id: str  # Post/Tweet/Video ID from the platform
+    
+    # Content
+    text: Optional[str] = None
+    title: Optional[str] = None  # For YouTube videos
+    description: Optional[str] = None  # For YouTube videos
+    
+    # Author/Creator
+    author: SocialContentAuthor
+    
+    # Timestamps
+    posted_at: datetime
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Media
+    media: List[SocialContentMedia] = Field(default_factory=list)
+    
+    # Engagement
+    engagement: SocialContentEngagement = Field(default_factory=SocialContentEngagement)
+    
+    # Platform-specific data (stored as JSON)
+    platform_data: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Extracted event (after LLM analysis)
+    extracted_event: Optional['EventData'] = None
+    
+    # Cache metadata
+    cached: bool = False
+    cache_expires_at: Optional[datetime] = None
+    
+    class Config:
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
+
+
+class FetchContentRequest(BaseModel):
+    """Request to fetch full content from a social media URL."""
+    url: str = Field(..., description="Social media post/tweet/video URL")
+    platform: str = Field(..., description="Platform name: facebook, twitter, youtube, instagram")
+    force_refresh: bool = Field(False, description="Force refresh even if cached")
+
+
+class FetchContentResponse(BaseModel):
+    """Response with full social media content."""
+    status: str
+    content: Optional[SocialFullContent] = None
+    error: Optional[str] = None
+    from_cache: bool = False
+    rate_limit_remaining: Optional[int] = None
+    rate_limit_reset: Optional[datetime] = None
+
+
+class AnalyseContentRequest(BaseModel):
+    """Request to analyse social content and extract events."""
+    content: SocialFullContent
+    llm_model: Optional[str] = Field(None, description="LLM model to use (default: from settings)")
+
+
+class AnalyseContentResponse(BaseModel):
+    """Response with extracted event from social content."""
+    status: str
+    event: Optional[EventData] = None
+    error: Optional[str] = None
+    llm_model_used: Optional[str] = None
+    processing_time_seconds: Optional[float] = None
