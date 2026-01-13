@@ -324,7 +324,9 @@ python -m uvicorn app.main:app --reload
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 #For production (HTTPS)
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=C:\Anu\code\socialSearcher\backend\ssl\key.pem --ssl-certfile=C:\Anu\code\socialSearcher\backend\ssl\cert.pem --reload
+python -m uvicorn app.main:app --ssl-keyfile=.\ssl\key.pem --ssl-certfile=.\ssl\cert.pem --reload
+
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --ssl-keyfile=.\ssl\key.pem --ssl-certfile=.\ssl\cert.pem --reload
 # Check Ollama
 ollama list
 curl http://localhost:11434
