@@ -15,6 +15,8 @@ build/
 # .env
 .env.local
 
+# Backend SSL
+backend/ssl/
 # IDE
 .vscode/
 .idea/
