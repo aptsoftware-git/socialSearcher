@@ -41,6 +41,8 @@ htmlcov/
 node_modules/
 frontend/build/
 frontend/dist/
+# Frontend SSL
+frontend/ssl/
 
 # Excel outputs
 *.xlsx
