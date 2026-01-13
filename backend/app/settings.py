@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     port: int = 8000
     reload: bool = False
     
+    # SSL/HTTPS
+    ssl_enabled: bool = False
+    ssl_cert_path: str = "./ssl/cert.pem"
+    ssl_key_path: str = "./ssl/key.pem"
+    
     # CORS
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     
