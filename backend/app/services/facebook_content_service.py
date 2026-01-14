@@ -127,16 +127,16 @@ class FacebookContentService:
         """
         # Check if we should use ScrapeCreators API instead
         if settings.facebook_scraper.upper() == "SCRAPECREATORS":
-            logger.info("🔄 Using ScrapeCreators API for Facebook content")
+            logger.info("Using ScrapeCreators API for Facebook content")
             scrapecreators_data = await scrapecreators_service.get_facebook_content(url)
             if scrapecreators_data:
                 return self._convert_scrapecreators_to_model(scrapecreators_data)
             else:
-                logger.warning("⚠️ ScrapeCreators failed, falling back to native Facebook API")
+                logger.warning("ScrapeCreators failed, falling back to native Facebook API")
                 # Fall through to native API
         
         # Use native Facebook Graph API
-        logger.info("🔄 Using native Facebook Graph API")
+        logger.info("Using native Facebook Graph API")
         
         if not self.access_token:
             logger.error("Facebook Access Token not configured")
@@ -390,9 +390,9 @@ class FacebookContentService:
                 }
             )
             
-            logger.info("✅ Converted ScrapeCreators Facebook data to SocialFullContent model")
+            logger.info("Converted ScrapeCreators Facebook data to SocialFullContent model")
             return content
             
         except Exception as e:
-            logger.error(f"❌ Error converting ScrapeCreators Facebook data to model: {e}")
+            logger.error(f"Error converting ScrapeCreators Facebook data to model: {e}")
             return None

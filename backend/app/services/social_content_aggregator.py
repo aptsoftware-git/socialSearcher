@@ -42,11 +42,11 @@ class SocialContentAggregator:
     
     def _get_from_cache(self, cache_key: str) -> Optional[SocialFullContent]:
         """Retrieve content from cache if not expired."""
-        logger.info(f"🔍 _get_from_cache called with key: {cache_key}")
-        logger.info(f"📊 Total cache entries: {len(self._cache)}")
+        # logger.info(f"_get_from_cache called with key: {cache_key}")
+        # logger.info(f"Total cache entries: {len(self._cache)}")
         
         if cache_key not in self._cache:
-            logger.warning(f"❌ Cache key not in cache. Available keys: {list(self._cache.keys())[:3]}")
+            # logger.warning(f"Cache key not in cache. Available keys: {list(self._cache.keys())[:3]}")
             return None
         
         cached_data = self._cache[cache_key]
@@ -55,10 +55,10 @@ class SocialContentAggregator:
         if expires_at and datetime.utcnow() > expires_at:
             # Cache expired, remove it
             del self._cache[cache_key]
-            logger.info(f"⏰ Cache expired for key: {cache_key}")
+            # logger.info(f"Cache expired for key: {cache_key}")
             return None
         
-        logger.info(f"✅ Cache hit for key: {cache_key}")
+        logger.info(f"Cache hit for key: {cache_key}")
         content = SocialFullContent(**cached_data['content'])
         content.cached = True
         content.cache_expires_at = expires_at
@@ -74,7 +74,7 @@ class SocialContentAggregator:
             'cached_at': datetime.utcnow()
         }
         
-        logger.info(f"💾 Saved content to cache - Key: {cache_key}, URL: {content.url[:60]}..., Platform: {content.platform}, Expires: {expires_at}")
+        logger.info(f"Saved content to cache - Key: {cache_key}, URL: {content.url[:60]}..., Platform: {content.platform}, Expires: {expires_at}")
     
     def get_cached_analysis(self, url: str, llm_model: Optional[str] = None) -> Optional[EventData]:
         """Retrieve cached AI analysis result."""
@@ -82,7 +82,7 @@ class SocialContentAggregator:
         logger.info(f"Looking for analysis with cache_key: {cache_key} (url: {url[:60]}..., model: {llm_model})")
         
         if cache_key not in self._analysis_cache:
-            logger.info(f"❌ Cache key not found. Available keys: {list(self._analysis_cache.keys())[:5]}...")
+            logger.info(f"Cache key not found. Available keys: {list(self._analysis_cache.keys())[:5]}...")
             return None
         
         cached_data = self._analysis_cache[cache_key]
@@ -94,7 +94,7 @@ class SocialContentAggregator:
             logger.debug(f"Analysis cache expired for key: {cache_key}")
             return None
         
-        logger.info(f"✅ Analysis cache hit for URL: {url[:60]}...")
+        logger.info(f"Analysis cache hit for URL: {url[:60]}...")
         return EventData(**cached_data['event'])
     
     def save_analysis_to_cache(self, url: str, event: EventData, llm_model: Optional[str] = None):
@@ -108,7 +108,7 @@ class SocialContentAggregator:
             'cached_at': datetime.utcnow()
         }
         
-        logger.info(f"💾 Saved analysis to cache - Key: {cache_key}, URL: {url[:60]}..., Model: {llm_model}, Title: {event.title[:50] if event.title else 'N/A'}...")
+        logger.info(f"Saved analysis to cache - Key: {cache_key}, URL: {url[:60]}..., Model: {llm_model}, Title: {event.title[:50] if event.title else 'N/A'}...")
     
     def check_cache_status(self, url: str, platform: str, llm_model: Optional[str] = None) -> Dict[str, bool]:
         """
@@ -193,7 +193,7 @@ class SocialContentAggregator:
                 return None
         
         platform = platform.lower()
-        logger.info(f"🔍 Fetching {platform} content from: {url[:80]}...")
+        logger.info(f"Fetching {platform} content from: {url[:80]}...")
         
         # Check cache first (unless force refresh)
         if not force_refresh:
@@ -201,27 +201,27 @@ class SocialContentAggregator:
             logger.info(f"🔑 Looking for content with cache_key: {cache_key}")
             cached_content = self._get_from_cache(cache_key)
             if cached_content:
-                logger.info(f"✅ CACHE HIT - Returning cached {platform} content for URL: {url[:60]}...")
+                logger.info(f"CACHE HIT - Returning cached {platform} content for URL: {url[:60]}...")
                 logger.info(f"Looking for analysis with llm_model: {llm_model}")
                 
                 # Check if we have cached analysis and attach it to content
                 cached_analysis = self.get_cached_analysis(url, llm_model)
                 if cached_analysis:
-                    logger.info(f"✅ Attaching cached analysis to content: {cached_analysis.title[:50] if cached_analysis.title else 'N/A'}...")
+                    # logger.info(f"Attaching cached analysis to content: {cached_analysis.title[:50] if cached_analysis.title else 'N/A'}...")
                     cached_content.extracted_event = cached_analysis
                 else:
-                    logger.warning(f"❌ No cached analysis found for URL with model: {llm_model}")
+                    pass  # logger.warning(f"No cached analysis found for URL with model: {llm_model}")
                     # Try without model (for backward compatibility)
                     cached_analysis_no_model = self.get_cached_analysis(url, None)
                     if cached_analysis_no_model:
-                        logger.info(f"✅ Found analysis without model: {cached_analysis_no_model.title[:50] if cached_analysis_no_model.title else 'N/A'}...")
+                        # logger.info(f"Found analysis without model: {cached_analysis_no_model.title[:50] if cached_analysis_no_model.title else 'N/A'}...")
                         cached_content.extracted_event = cached_analysis_no_model
                 
                 return cached_content
             else:
-                logger.warning(f"❌ CACHE MISS - No cached content found. Available cache keys (first 5): {list(self._cache.keys())[:5]}")
+                pass  # logger.warning(f"CACHE MISS - No cached content found. Available cache keys (first 5): {list(self._cache.keys())[:5]}")
         else:
-            logger.info(f"⚠️ Force refresh enabled - skipping cache lookup")
+            pass  # logger.info(f"Force refresh enabled - skipping cache lookup")
         
         # Fetch from appropriate service
         content = None

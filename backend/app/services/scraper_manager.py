@@ -345,12 +345,12 @@ class ScraperManager:
             
             # Validate content
             if not self.content_extractor.is_valid_content(content):
-                logger.warning(
-                    f"Invalid or insufficient content from {url} "
-                    f"(title_len={len(title) if title else 0}, "
-                    f"content_len={len(content) if content else 0}, "
-                    f"extracted_fields={list(extracted.keys())})"
-                )
+                # logger.warning(
+                #     f"Invalid or insufficient content from {url} "
+                #     f"(title_len={len(title) if title else 0}, "
+                #     f"content_len={len(content) if content else 0}, "
+                #     f"extracted_fields={list(extracted.keys())})"
+                # )
                 return None
             
             # Create ArticleContent object
@@ -672,7 +672,7 @@ class ScraperManager:
                     logger.info(f"[SCRAPING] Successfully scraped article {idx} from {source_config.name} ({scraped_count}/{effective_max_articles})")
                 else:
                     failed_count += 1
-                    logger.warning(f"[SCRAPING] Failed to scrape article {idx} from {source_config.name} (failures: {failed_count})")
+                    # logger.warning(f"[SCRAPING] Failed to scrape article {idx} from {source_config.name} (failures: {failed_count})")
             
             if attempted_count > 0:
                 logger.info(

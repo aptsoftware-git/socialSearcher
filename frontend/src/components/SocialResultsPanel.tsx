@@ -351,29 +351,29 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           // Fetch cached content/analysis if either is available
           if (cacheInfo?.content_cached || cacheInfo?.analysis_cached) {
             try {
-              console.log(`Fetching content for: ${result.link.substring(0, 50)}...`);
+              // console.log(`Fetching content for: ${result.link.substring(0, 50)}...`);
               const contentResponse = await apiService.fetchSocialContent({
                 url: result.link,
                 platform: platform,
                 force_refresh: false,
                 llm_model: llmModel, // Pass LLM model to fetch cached analysis
               });
-              console.log(`Response status: ${contentResponse.status}`);
+              // console.log(`Response status: ${contentResponse.status}`);
               if (contentResponse.status === 'success' && contentResponse.content) {
                 cachedContent = contentResponse.content;
-                console.log(`Has extracted_event: ${!!contentResponse.content.extracted_event}`);
+                // console.log(`Has extracted_event: ${!!contentResponse.content.extracted_event}`);
                 // Check if there's an extracted_event in the cached content
                 if (contentResponse.content.extracted_event) {
                   cachedAnalysis = contentResponse.content.extracted_event;
-                  console.log(`Analysis title: ${cachedAnalysis.title?.substring(0, 50)}...`);
+                  // console.log(`Analysis title: ${cachedAnalysis.title?.substring(0, 50)}...`);
                 }
               }
             } catch (error) {
               console.error('Failed to fetch cached content for export:', error);
             }
-          } else {
-            console.log(`Skipping fetch for ${result.link.substring(0, 50)}... - No cache`);
-          }
+          } // else {
+            // console.log(`Skipping fetch for ${result.link.substring(0, 50)}... - No cache`);
+          // }
 
           return {
             url: result.link,
@@ -388,15 +388,15 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       );
 
       // Debug: Log what we're sending
-      console.log('Export items count:', exportItems.length);
-      if (exportItems.length > 0) {
-        console.log('First item:', {
-          url: exportItems[0].url,
-          has_cached_content: !!exportItems[0].cached_content,
-          has_cached_analysis: !!exportItems[0].cached_analysis,
-          analysis_title: exportItems[0].cached_analysis?.title
-        });
-      }
+      // console.log('Export items count:', exportItems.length);
+      // if (exportItems.length > 0) {
+      //   console.log('First item:', {
+      //     url: exportItems[0].url,
+      //     has_cached_content: !!exportItems[0].cached_content,
+      //     has_cached_analysis: !!exportItems[0].cached_analysis,
+      //     analysis_title: exportItems[0].cached_analysis?.title
+      //   });
+      // }
 
       // Export to Excel
       const blob = await apiService.exportSocialEvents(exportItems, platformName, llmModel);

@@ -23,7 +23,7 @@ class ScrapeCreatorsService:
         self.timeout = 30  # 30 seconds timeout
         
         if not self.api_key:
-            logger.warning("⚠️ ScrapeCreators API key not configured. Set SCRAPECREATORS_API_KEY in .env")
+            logger.warning("ScrapeCreators API key not configured. Set SCRAPECREATORS_API_KEY in .env")
     
     async def get_twitter_content(self, url: str) -> Optional[Dict[str, Any]]:
         """
@@ -36,7 +36,7 @@ class ScrapeCreatorsService:
             Formatted content dict or None on error
         """
         if not self.api_key:
-            logger.error("❌ ScrapeCreators API key not configured")
+            logger.error("ScrapeCreators API key not configured")
             return None
         
         try:
@@ -71,20 +71,20 @@ class ScrapeCreatorsService:
                         
                     return self._format_twitter_content(actual_data, url)
                 elif response.status_code == 401:
-                    logger.error("❌ ScrapeCreators: Invalid API key")
+                    logger.error("ScrapeCreators: Invalid API key")
                     return None
                 elif response.status_code == 402:
-                    logger.error("❌ ScrapeCreators: Insufficient credits")
+                    logger.error("ScrapeCreators: Insufficient credits")
                     return None
                 else:
-                    logger.error(f"❌ ScrapeCreators API error: {response.status_code}")
+                    logger.error(f"ScrapeCreators API error: {response.status_code}")
                     return None
                     
         except httpx.TimeoutException:
-            logger.error(f"⏱️ Timeout fetching Twitter content from ScrapeCreators")
+            logger.error(f"Timeout fetching Twitter content from ScrapeCreators")
             return None
         except Exception as e:
-            logger.error(f"❌ Error fetching Twitter content from ScrapeCreators: {e}")
+            logger.error(f"Error fetching Twitter content from ScrapeCreators: {e}")
             return None
     
     async def get_facebook_content(self, url: str) -> Optional[Dict[str, Any]]:
@@ -98,7 +98,7 @@ class ScrapeCreatorsService:
             Formatted content dict or None on error
         """
         if not self.api_key:
-            logger.error("❌ ScrapeCreators API key not configured")
+            logger.error("ScrapeCreators API key not configured")
             return None
         
         try:
@@ -115,20 +115,20 @@ class ScrapeCreatorsService:
                     data = response.json()
                     return self._format_facebook_content(data, url)
                 elif response.status_code == 401:
-                    logger.error("❌ ScrapeCreators: Invalid API key")
+                    logger.error("ScrapeCreators: Invalid API key")
                     return None
                 elif response.status_code == 402:
-                    logger.error("❌ ScrapeCreators: Insufficient credits")
+                    logger.error("ScrapeCreators: Insufficient credits")
                     return None
                 else:
-                    logger.error(f"❌ ScrapeCreators API error: {response.status_code}")
+                    logger.error(f"ScrapeCreators API error: {response.status_code}")
                     return None
                     
         except httpx.TimeoutException:
-            logger.error(f"⏱️ Timeout fetching Facebook content from ScrapeCreators")
+            logger.error(f"Timeout fetching Facebook content from ScrapeCreators")
             return None
         except Exception as e:
-            logger.error(f"❌ Error fetching Facebook content from ScrapeCreators: {e}")
+            logger.error(f"Error fetching Facebook content from ScrapeCreators: {e}")
             return None
     
     async def get_instagram_content(self, url: str) -> Optional[Dict[str, Any]]:
@@ -142,7 +142,7 @@ class ScrapeCreatorsService:
             Formatted content dict or None on error
         """
         if not self.api_key:
-            logger.error("❌ ScrapeCreators API key not configured")
+            logger.error("ScrapeCreators API key not configured")
             return None
         
         try:
@@ -159,20 +159,20 @@ class ScrapeCreatorsService:
                     data = response.json()
                     return self._format_instagram_content(data, url)
                 elif response.status_code == 401:
-                    logger.error("❌ ScrapeCreators: Invalid API key")
+                    logger.error("ScrapeCreators: Invalid API key")
                     return None
                 elif response.status_code == 402:
-                    logger.error("❌ ScrapeCreators: Insufficient credits")
+                    logger.error("ScrapeCreators: Insufficient credits")
                     return None
                 else:
-                    logger.error(f"❌ ScrapeCreators API error: {response.status_code}")
+                    logger.error(f"ScrapeCreators API error: {response.status_code}")
                     return None
                     
         except httpx.TimeoutException:
-            logger.error(f"⏱️ Timeout fetching Instagram content from ScrapeCreators")
+            logger.error(f"Timeout fetching Instagram content from ScrapeCreators")
             return None
         except Exception as e:
-            logger.error(f"❌ Error fetching Instagram content from ScrapeCreators: {e}")
+            logger.error(f"Error fetching Instagram content from ScrapeCreators: {e}")
             return None
     
     def _format_twitter_content(self, data: Dict[str, Any], url: str) -> Dict[str, Any]:
@@ -293,7 +293,7 @@ class ScrapeCreatorsService:
             return formatted
             
         except Exception as e:
-            logger.error(f"❌ Error formatting Twitter content: {e}")
+            logger.error(f"Error formatting Twitter content: {e}")
             # Return minimal format on error
             return {
                 "platform": "twitter",
@@ -402,7 +402,7 @@ class ScrapeCreatorsService:
             return formatted
             
         except Exception as e:
-            logger.error(f"❌ Error formatting Facebook content: {e}")
+            logger.error(f"Error formatting Facebook content: {e}")
             return {
                 "platform": "facebook",
                 "url": url,
@@ -525,7 +525,7 @@ class ScrapeCreatorsService:
             return formatted
             
         except Exception as e:
-            logger.error(f"❌ Error formatting Instagram content: {e}")
+            logger.error(f"Error formatting Instagram content: {e}")
             return {
                 "platform": "instagram",
                 "url": url,

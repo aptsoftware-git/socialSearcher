@@ -829,8 +829,8 @@ class SearchService:
                             logger.debug(f"Session {session_id}: Extracted event {extracted_count} from article {idx}/{total_articles}")
                         else:
                             logger.debug(f"Event from article {idx} not relevant enough (score < {min_relevance_score})")
-                    else:
-                        logger.warning(f"Failed to extract event from article {idx}")
+                    # else:
+                        # logger.warning(f"Failed to extract event from article {idx}")
                         
                 except Exception as e:
                     logger.error(f"Error extracting event from article {idx}: {e}")
@@ -857,7 +857,7 @@ class SearchService:
                 }
             }
             
-            logger.info(f"✅ Streaming search completed for session {session_id}: {extracted_count} events in {processing_time:.2f}s")
+            logger.info(f"Streaming search completed for session {session_id}: {extracted_count} events in {processing_time:.2f}s")
             
         except Exception as e:
             logger.error(f"Streaming search failed for session {session_id}: {e}", exc_info=True)

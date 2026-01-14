@@ -103,7 +103,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
         }
       } catch (err) {
         // Silently fail - user can still manually click "ANALYSE WITH AI"
-        console.debug('No cached analysis available', err);
+        // console.debug('No cached analysis available', err);
       } finally {
         setLoadingCache(false);
       }
