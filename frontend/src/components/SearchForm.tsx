@@ -169,13 +169,8 @@ const SearchForm: React.FC<SearchFormProps> = ({
       if (formData.use_social_search) {
         try {
           const { apiService } = await import('../services/api');
-          console.log('🔍 Starting social search for:', formData.phrase);
           
           const socialResults = await apiService.socialSearch(formData.phrase);
-          console.log('✅ Social search completed!');
-          console.log('📊 Total results:', socialResults.total_results);
-          console.log('🌐 Sites searched:', socialResults.sites);
-          console.log('📝 Results:', socialResults.results);
           
           // Pass results to parent component for display
           if (onSocialResults) {
@@ -195,7 +190,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
           return;
           
         } catch (socialError) {
-          console.error('❌ Social search failed:', socialError);
+          console.error('Social search failed:', socialError);
           setLoading(false);
           const errorMessage = socialError instanceof Error ? socialError.message : 'Social search failed';
           setError(errorMessage);
@@ -207,7 +202,6 @@ const SearchForm: React.FC<SearchFormProps> = ({
       }
 
       // Only run regular streaming search if social search is disabled
-      console.log('🔍 Starting regular streaming search...');
       const { streamService } = await import('../services/streamService');
       
       // Start streaming search (regular search)

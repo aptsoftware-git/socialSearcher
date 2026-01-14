@@ -35,7 +35,7 @@ class SessionStore:
     def __init__(self):
         self._sessions: Dict[str, Dict[str, Any]] = {}
         self._cancelled_sessions: set = set()  # Track cancelled sessions
-        logger.info("SessionStore initialized")
+        logger.debug("SessionStore initialized")
     
     def create_session(
         self,
@@ -134,10 +134,10 @@ class SessionStore:
         Args:
             session_id: Session ID to cancel
         """
-        logger.info(f"[SESSION-STORE] Cancelling session {session_id}")
-        logger.info(f"[SESSION-STORE] Cancelled sessions before: {self._cancelled_sessions}")
+        logger.debug(f"[SESSION-STORE] Cancelling session {session_id}")
+        logger.debug(f"[SESSION-STORE] Cancelled sessions before: {self._cancelled_sessions}")
         self._cancelled_sessions.add(session_id)
-        logger.info(f"[SESSION-STORE] Cancelled sessions after: {self._cancelled_sessions}")
+        logger.debug(f"[SESSION-STORE] Cancelled sessions after: {self._cancelled_sessions}")
         self.update_status(session_id, SearchStatus.CANCELLED)
         logger.warning(f"[SESSION-STORE] Session {session_id} marked as cancelled")
     
@@ -426,11 +426,11 @@ class SearchService:
         seen_urls = set()  # Track URLs to avoid duplicates
         
         try:
-            logger.info(f"[SCRAPING] Starting scraping from {len(sources)} sources for query: '{query}' - Session: {session_id}")
+            logger.info(f"Starting scraping from {len(sources)} sources for query: '{query}'")
             
             for idx, source in enumerate(sources, 1):
                 # Check for cancellation before each source
-                logger.info(f"[CANCEL-CHECK] Before source {idx}/{len(sources)} ({source.name}) - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id) if session_id else False}")
+                logger.debug(f"[CANCEL-CHECK] Before source {idx}/{len(sources)} ({source.name}) - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id) if session_id else False}")
                 if session_id and self.session_store.is_cancelled(session_id):
                     logger.warning(f"[CANCELLED] Search cancelled for session {session_id} during scraping at source {source.name}")
                     return all_articles  # Return articles collected so far
@@ -440,7 +440,7 @@ class SearchService:
                     continue
                 
                 try:
-                    logger.info(f"[SCRAPING] Starting source {idx}/{len(sources)}: {source.name} - Session {session_id}")
+                    logger.debug(f"Starting source {idx}/{len(sources)}: {source.name} - Session {session_id}")
                     # Scrape from this source (pass None to use source config or global defaults)
                     articles = await scraper_manager.scrape_search_results(
                         source,
@@ -462,13 +462,13 @@ class SearchService:
                             logger.debug(f"Skipping duplicate URL from {source.name}: {article.url}")
                     
                     if duplicate_count > 0:
-                        logger.info(f"[DUPLICATE-FILTER] Filtered {duplicate_count} duplicate URL(s) from {source.name}")
+                        logger.debug(f"Filtered {duplicate_count} duplicate URL(s) from {source.name}")
                     
                     all_articles.extend(unique_articles)
-                    logger.info(f"[SCRAPING] Got {len(unique_articles)} unique articles from {source.name} ({duplicate_count} duplicates filtered) - Session {session_id}")
+                    logger.debug(f"Got {len(unique_articles)} unique articles from {source.name} ({duplicate_count} duplicates filtered)")
                     
                     # Check for cancellation after each source
-                    logger.info(f"[CANCEL-CHECK] After source {idx}/{len(sources)} ({source.name}) - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id) if session_id else False}")
+                    logger.debug(f"[CANCEL-CHECK] After source {idx}/{len(sources)} ({source.name}) - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id) if session_id else False}")
                     if session_id and self.session_store.is_cancelled(session_id):
                         logger.warning(f"[CANCELLED] Search cancelled for session {session_id} after scraping {source.name}")
                         return all_articles  # Return articles collected so far
@@ -477,7 +477,7 @@ class SearchService:
                     logger.error(f"Error scraping {source.name}: {e}")
                     continue
             
-            logger.info(f"[SCRAPING] Total unique articles scraped: {len(all_articles)} (from {len(seen_urls)} unique URLs) - Session {session_id}")
+            logger.info(f"Total unique articles scraped: {len(all_articles)} (from {len(seen_urls)} unique URLs)")
             return all_articles
             
         except Exception as e:
@@ -510,7 +510,7 @@ class SearchService:
         total_timeout = settings.ollama_total_timeout
         start_time = datetime.now()
         
-        logger.info(f"Starting parallel LLM extraction with {total_timeout}s total timeout, max {settings.max_concurrent_llm} concurrent")
+        logger.debug(f"Starting parallel LLM extraction with {total_timeout}s total timeout, max {settings.max_concurrent_llm} concurrent")
         
         # Process articles in parallel batches for better CPU utilization
         async def process_article_with_timeout(article, index):
@@ -548,7 +548,7 @@ class SearchService:
             batch_end = min(batch_start + batch_size, len(articles_to_process))
             batch = articles_to_process[batch_start:batch_end]
             
-            logger.info(f"Processing batch {batch_start//batch_size + 1}: articles {batch_start+1}-{batch_end}/{len(articles_to_process)}")
+            logger.debug(f"Processing batch {batch_start//batch_size + 1}: articles {batch_start+1}-{batch_end}/{len(articles_to_process)}")
             
             # Process batch in parallel
             tasks = [
@@ -685,7 +685,7 @@ class SearchService:
             }
             
             # Check for cancellation before starting scraping (can be slow)
-            logger.info(f"[CANCEL-CHECK] Before scraping - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
+            logger.debug(f"[CANCEL-CHECK] Before scraping - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
             if self.session_store.is_cancelled(session_id):
                 logger.warning(f"[CANCELLED] Search cancelled for session {session_id} before scraping")
                 yield {
@@ -694,12 +694,12 @@ class SearchService:
                 }
                 return
             
-            logger.info(f"[SCRAPING] Starting scraping for session {session_id}")
+            logger.info(f"Starting scraping for session {session_id}")
             articles = await self._scrape_articles(sources, search_phrase, max_articles_to_process, session_id)
-            logger.info(f"[SCRAPING] Completed scraping for session {session_id} - Got {len(articles)} articles")
+            logger.info(f"Completed scraping - Got {len(articles)} articles")
             
             # Check for cancellation after scraping
-            logger.info(f"[CANCEL-CHECK] After scraping - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
+            logger.debug(f"[CANCEL-CHECK] After scraping - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
             if self.session_store.is_cancelled(session_id):
                 logger.warning(f"[CANCELLED] Search cancelled for session {session_id} after scraping")
                 yield {
@@ -738,7 +738,7 @@ class SearchService:
             
             for idx, article in enumerate(articles, 1):
                 # Check for cancellation before each article
-                logger.info(f"[CANCEL-CHECK] Before article {idx}/{total_articles} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
+                logger.debug(f"[CANCEL-CHECK] Before article {idx}/{total_articles} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
                 if self.session_store.is_cancelled(session_id):
                     logger.warning(f"[CANCELLED] Search cancelled for session {session_id} at article {idx}/{total_articles}")
                     yield {
@@ -772,7 +772,7 @@ class SearchService:
                 # Extract event from article
                 try:
                     # Check cancellation BEFORE starting LLM extraction (expensive operation)
-                    logger.info(f"[CANCEL-CHECK] Before LLM extraction article {idx} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
+                    logger.debug(f"[CANCEL-CHECK] Before LLM extraction article {idx} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
                     if self.session_store.is_cancelled(session_id):
                         logger.warning(f"[CANCELLED] Search cancelled for session {session_id} before extracting article {idx}")
                         yield {
@@ -784,16 +784,16 @@ class SearchService:
                         }
                         return
                     
-                    logger.info(f"[LLM] Starting extraction for article {idx}/{total_articles} - Session {session_id}")
+                    logger.debug(f"[LLM] Starting extraction for article {idx}/{total_articles} - Session {session_id}")
                     event, metadata = await event_extractor.extract_from_article(
                         article,
                         llm_provider=llm_provider,
                         llm_model=llm_model
                     )
-                    logger.info(f"[LLM] Completed extraction for article {idx}/{total_articles} - Session {session_id} - Provider: {metadata.get('provider', 'unknown')}")
+                    logger.debug(f"[LLM] Completed extraction for article {idx}/{total_articles} - Session {session_id} - Provider: {metadata.get('provider', 'unknown')}")
                     
                     # Check cancellation AFTER extraction completes (in case it was cancelled during LLM call)
-                    logger.info(f"[CANCEL-CHECK] After LLM extraction article {idx} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
+                    logger.debug(f"[CANCEL-CHECK] After LLM extraction article {idx} - Session {session_id} cancelled: {self.session_store.is_cancelled(session_id)}")
                     if self.session_store.is_cancelled(session_id):
                         logger.warning(f"[CANCELLED] Search cancelled for session {session_id} after extracting article {idx}")
                         yield {
@@ -826,7 +826,7 @@ class SearchService:
                                 }
                             }
                             
-                            logger.info(f"✅ Session {session_id}: Extracted event {extracted_count} from article {idx}/{total_articles}")
+                            logger.debug(f"Session {session_id}: Extracted event {extracted_count} from article {idx}/{total_articles}")
                         else:
                             logger.debug(f"Event from article {idx} not relevant enough (score < {min_relevance_score})")
                     else:

@@ -435,6 +435,7 @@ class FetchContentRequest(BaseModel):
     url: str = Field(..., description="Social media post/tweet/video URL")
     platform: str = Field(..., description="Platform name: facebook, twitter, youtube, instagram")
     force_refresh: bool = Field(False, description="Force refresh even if cached")
+    llm_model: Optional[str] = Field(None, description="LLM model name to check for cached analysis")
 
 
 class FetchContentResponse(BaseModel):
@@ -460,3 +461,21 @@ class AnalyseContentResponse(BaseModel):
     error: Optional[str] = None
     llm_model_used: Optional[str] = None
     processing_time_seconds: Optional[float] = None
+
+
+class SocialEventExportItem(BaseModel):
+    """Social search result with optional cached content and analysis."""
+    url: str
+    platform: str
+    title: str
+    snippet: str
+    display_link: str
+    cached_content: Optional[SocialFullContent] = None
+    cached_analysis: Optional[EventData] = None
+
+
+class ExportSocialEventsRequest(BaseModel):
+    """Request to export social media search results."""
+    items: List[SocialEventExportItem]
+    platform_filter: Optional[str] = Field(None, description="Platform name for filename (e.g., 'youtube', 'twitter')")
+    llm_model: Optional[str] = Field(None, description="LLM model used for analysis")

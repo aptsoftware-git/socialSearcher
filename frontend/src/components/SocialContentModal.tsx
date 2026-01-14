@@ -44,6 +44,7 @@ interface SocialContentModalProps {
   onClose: () => void;
   content: SocialFullContent | null;
   llmModel?: string;
+  onCacheUpdate?: () => void;  // Callback to refresh cache status
 }
 
 const SocialContentModal: React.FC<SocialContentModalProps> = ({
@@ -51,7 +52,16 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
   onClose,
   content,
   llmModel,
+  onCacheUpdate,
 }) => {
+  // Helper function to proxy Instagram images through backend (fixes CORS issues)
+  const getProxiedImageUrl = (url: string, platform: string): string => {
+    if (platform === 'instagram' && url) {
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8000';
+      return `${apiBaseUrl}/api/v1/proxy-image?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  };
   const [analyzing, setAnalyzing] = useState(false);
   const [extractedEvent, setExtractedEvent] = useState<EventData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +94,11 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
           if (response.status === 'success' && response.event) {
             setExtractedEvent(response.event);
             setIsCached(true);
+            
+            // Notify parent to refresh cache status since we loaded cached analysis
+            if (onCacheUpdate) {
+              onCacheUpdate();
+            }
           }
         }
       } catch (err) {
@@ -95,7 +110,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
     };
 
     checkCachedAnalysis();
-  }, [content, open, llmModel]); // Check when content, modal state, or model changes
+  }, [content, open, llmModel, onCacheUpdate]); // Check when content, modal state, or model changes
 
   if (!content) return null;
 
@@ -195,6 +210,14 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
         // Store in localStorage that this URL has been analyzed
         const analyzedKey = `analyzed_${content.url}_${llmModel || 'default'}`;
         localStorage.setItem(analyzedKey, 'true');
+        
+        // Wait a moment for backend to update cache, then notify parent to refresh cache status
+        if (onCacheUpdate) {
+          // Small delay to ensure backend cache is updated
+          setTimeout(() => {
+            onCacheUpdate();
+          }, 500);
+        }
       } else {
         setError(response.error || 'Failed to extract event from content');
       }
@@ -274,7 +297,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
         <Box mb={3}>
           <Stack direction="row" spacing={2} alignItems="center">
             <Avatar
-              src={content.author.profile_picture}
+              src={getProxiedImageUrl(content.author.profile_picture || '', content.platform)}
               alt={content.author.name}
               sx={{ width: 56, height: 56 }}
             />
@@ -418,7 +441,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
                       }}
                     >
                       <img
-                        src={media.url}
+                        src={getProxiedImageUrl(media.url, content.platform)}
                         alt={`Media ${index + 1}`}
                         loading="lazy"
                         style={{

@@ -121,6 +121,12 @@ class Settings(BaseSettings):
     enable_full_content_fetch: bool = True
     cache_social_content_hours: int = 24
     
+    # ScrapeCreators Third-Party API Configuration
+    scrapecreators_api_key: str = ""  # ScrapeCreators API key for third-party scraping
+    twitter_scraper: str = "NATIVE"   # Options: NATIVE or SCRAPECREATORS
+    facebook_scraper: str = "NATIVE"  # Options: NATIVE or SCRAPECREATORS
+    instagram_scraper: str = "NATIVE" # Options: NATIVE or SCRAPECREATORS
+    
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from comma-separated string."""

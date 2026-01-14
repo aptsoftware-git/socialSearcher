@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -15,6 +15,8 @@ import {
   Button,
   CircularProgress,
   Snackbar,
+  Tooltip,
+  Checkbox,
 } from '@mui/material';
 import {
   Facebook as FacebookIcon,
@@ -24,6 +26,9 @@ import {
   Instagram as InstagramIcon,
   Info as InfoIcon,
   YouTube as YouTubeIcon,
+  CheckCircle as CheckCircleIcon,
+  Psychology as PsychologyIcon,
+  FileDownload as DownloadIcon,
 } from '@mui/icons-material';
 import { SocialSearchResult, SocialFullContent } from '../types/events';
 import { apiService } from '../services/api';
@@ -38,8 +43,6 @@ function useImageBlobUrl(proxyUrl: string | null): string | null {
       setBlobUrl(null);
       return;
     }
-
-    console.log('🔄 Fetching blob for:', proxyUrl);
     
     let objectUrl: string | null = null;
 
@@ -50,35 +53,21 @@ function useImageBlobUrl(proxyUrl: string | null): string | null {
       credentials: 'same-origin',
     })
       .then(response => {
-        console.log('✅ Blob fetch response:', response.status, response.headers.get('content-type'));
-        console.log('📊 Response headers:', {
-          contentType: response.headers.get('content-type'),
-          contentLength: response.headers.get('content-length'),
-          cacheControl: response.headers.get('cache-control'),
-        });
         if (!response.ok) throw new Error('Failed to fetch image');
-        
-        // Clone the response to read it as text for debugging
-        return response.clone().text().then(text => {
-          console.log('📝 Response preview (first 200 chars):', text.substring(0, 200));
-          return response.blob();
-        });
+        return response.blob();
       })
       .then(blob => {
-        console.log('✅ Blob created:', blob.size, 'bytes, type:', blob.type);
         objectUrl = URL.createObjectURL(blob);
-        console.log('✅ Object URL created:', objectUrl);
         setBlobUrl(objectUrl);
       })
       .catch(error => {
-        console.error('❌ Error fetching image blob:', error);
+        console.error('Error fetching image blob:', error);
         setBlobUrl(null);
       });
 
     // Cleanup: revoke object URL when component unmounts or proxyUrl changes
     return () => {
       if (objectUrl) {
-        console.log('🧹 Cleaning up blob URL:', objectUrl);
         URL.revokeObjectURL(objectUrl);
       }
     };
@@ -95,12 +84,6 @@ const ProxiedImage: React.FC<{
   const blobUrl = useImageBlobUrl(proxiedImageUrl);
   const imgSrc = blobUrl || proxiedImageUrl;
   
-  console.log('🖼️ ProxiedImage render:', {
-    proxiedImageUrl,
-    blobUrl,
-    using: imgSrc
-  });
-  
   return (
     <Box
       component="img"
@@ -111,11 +94,8 @@ const ProxiedImage: React.FC<{
         height: '100%',
         objectFit: 'cover',
       }}
-      onLoad={() => {
-        console.log('✅ Image loaded successfully:', imgSrc);
-      }}
       onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-        console.error('❌ Image failed to load:', imgSrc);
+        console.error('Image failed to load:', imgSrc);
         // Hide the entire image container if image fails to load
         const parent = e.currentTarget.parentElement;
         if (parent) parent.style.display = 'none';
@@ -164,6 +144,55 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   const [loadingContent, setLoadingContent] = useState<string | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState<Record<string, {content_cached: boolean, analysis_cached: boolean}>>({});
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const [exportSuccess, setExportSuccess] = useState(false);
+
+  // Helper function to get current LLM model from localStorage
+  const getCurrentLlmModel = () => {
+    try {
+      const saved = localStorage.getItem('llm_config');
+      if (saved) {
+        const config = JSON.parse(saved);
+        return config.model || 'claude-3-5-haiku-20241022';
+      }
+    } catch (e) {
+      console.error('Failed to read LLM config:', e);
+    }
+    return 'claude-3-5-haiku-20241022'; // Default
+  };
+
+  // Function to check cache status for all results
+  const checkCacheStatus = useCallback(async () => {
+    if (!results || results.length === 0) return;
+
+    try {
+      const urls = results.map(r => ({
+        url: r.link,
+        platform: r.source_site.includes('facebook') ? 'facebook' :
+                 r.source_site.includes('twitter') || r.source_site.includes('x.com') ? 'twitter' :
+                 r.source_site.includes('youtube') ? 'youtube' :
+                 r.source_site.includes('instagram') ? 'instagram' : 'web'
+      }));
+
+      // Get current LLM model to check analysis cache with correct model
+      const llmModel = getCurrentLlmModel();
+      
+      const response = await apiService.checkCacheStatus(urls, llmModel);
+      
+      if (response.status === 'success') {
+        setCacheStatus(response.cache_status || {});
+      }
+    } catch (error) {
+      console.error('Failed to check cache status:', error);
+    }
+  }, [results]);
+
+  // Check cache status when results load
+  useEffect(() => {
+    checkCacheStatus();
+  }, [results, checkCacheStatus]);
 
   if (!results || results.length === 0) {
     return null;
@@ -257,6 +286,142 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     setSelectedContent(null);
     setContentError(null);
     setSnackbarOpen(false);
+    // Refresh cache status after modal closes (content or AI analysis may have been cached)
+    checkCacheStatus();
+  };
+
+  // Handle item selection toggle
+  const handleToggleSelection = (url: string) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(url)) {
+        newSet.delete(url);
+      } else {
+        newSet.add(url);
+      }
+      return newSet;
+    });
+  };
+
+  // Handle select all / deselect all for a specific platform
+  const handleSelectAll = (platformResults: SocialSearchResult[]) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      platformResults.forEach(result => newSet.add(result.link));
+      return newSet;
+    });
+  };
+
+  const handleDeselectAll = (platformResults: SocialSearchResult[]) => {
+    setSelectedItems(prev => {
+      const newSet = new Set(prev);
+      platformResults.forEach(result => newSet.delete(result.link));
+      return newSet;
+    });
+  };
+
+  // Handle export for a specific platform
+  const handleExport = async (platformResults: SocialSearchResult[], platformName: string) => {
+    try {
+      setExporting(true);
+      
+      // Determine which items to export
+      const itemsToExport = selectedItems.size > 0
+        ? platformResults.filter(r => selectedItems.has(r.link))
+        : platformResults;
+
+      if (itemsToExport.length === 0) {
+        setContentError('No items to export');
+        setSnackbarOpen(true);
+        return;
+      }
+
+      // Get current LLM model
+      const llmModel = getCurrentLlmModel();
+
+      // Fetch cached content and analysis for each item
+      const exportItems = await Promise.all(
+        itemsToExport.map(async (result) => {
+          const platform = detectPlatform(result.link, result.source_site);
+          const cacheInfo = cacheStatus[result.link];
+          
+          let cachedContent = undefined;
+          let cachedAnalysis = undefined;
+
+          // Fetch cached content/analysis if either is available
+          if (cacheInfo?.content_cached || cacheInfo?.analysis_cached) {
+            try {
+              console.log(`Fetching content for: ${result.link.substring(0, 50)}...`);
+              const contentResponse = await apiService.fetchSocialContent({
+                url: result.link,
+                platform: platform,
+                force_refresh: false,
+                llm_model: llmModel, // Pass LLM model to fetch cached analysis
+              });
+              console.log(`Response status: ${contentResponse.status}`);
+              if (contentResponse.status === 'success' && contentResponse.content) {
+                cachedContent = contentResponse.content;
+                console.log(`Has extracted_event: ${!!contentResponse.content.extracted_event}`);
+                // Check if there's an extracted_event in the cached content
+                if (contentResponse.content.extracted_event) {
+                  cachedAnalysis = contentResponse.content.extracted_event;
+                  console.log(`Analysis title: ${cachedAnalysis.title?.substring(0, 50)}...`);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to fetch cached content for export:', error);
+            }
+          } else {
+            console.log(`Skipping fetch for ${result.link.substring(0, 50)}... - No cache`);
+          }
+
+          return {
+            url: result.link,
+            platform: platform,
+            title: result.title,
+            snippet: result.snippet,
+            display_link: result.display_link,
+            cached_content: cachedContent,
+            cached_analysis: cachedAnalysis,
+          };
+        })
+      );
+
+      // Debug: Log what we're sending
+      console.log('Export items count:', exportItems.length);
+      if (exportItems.length > 0) {
+        console.log('First item:', {
+          url: exportItems[0].url,
+          has_cached_content: !!exportItems[0].cached_content,
+          has_cached_analysis: !!exportItems[0].cached_analysis,
+          analysis_title: exportItems[0].cached_analysis?.title
+        });
+      }
+
+      // Export to Excel
+      const blob = await apiService.exportSocialEvents(exportItems, platformName, llmModel);
+      
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0] + '_' + 
+                        new Date().toTimeString().split(' ')[0].replace(/:/g, '-');
+      const filename = `${platformName.toLowerCase()}_events_${timestamp}.xlsx`;
+      
+      // Download file
+      apiService.downloadBlob(blob, filename);
+      
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+      
+      // Clear selection after successful export
+      setSelectedItems(new Set());
+    } catch (error) {
+      console.error('Export failed:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to export data';
+      setContentError(errorMsg);
+      setSnackbarOpen(true);
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Get icon for site
@@ -284,26 +449,11 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
 
   // Extract image from pagemap
   const getImageFromResult = (result: SocialSearchResult): string | null => {
-    console.log('Processing result from:', result.source_site, '| Title:', result.title);
-    
     if (!result.pagemap) {
-      console.log('❌ No pagemap found for:', result.source_site);
       return null;
     }
     
     const pagemap = result.pagemap;
-    
-    // Debug: Log pagemap structure for ALL results to compare
-    console.log(`📋 Pagemap keys for ${result.source_site}:`, Object.keys(pagemap));
-    
-    // Extra debug for Facebook
-    if (result.source_site.includes('facebook')) {
-      console.log('🔍 === FACEBOOK RESULT DETAILED ===');
-      console.log('Title:', result.title);
-      console.log('Link:', result.link);
-      console.log('Pagemap:', pagemap);
-      console.log('Pagemap JSON:', JSON.stringify(pagemap, null, 2));
-    }
     
     // Helper function to safely get image URL from various structures
     const tryGetImageUrl = (data: unknown): string | null => {
@@ -344,7 +494,6 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     // For Facebook, prefer og:image over cse_image (lookaside URLs are often low quality)
     if (result.source_site.includes('facebook') && pagemap['metatags']) {
-      console.log('🔍 Facebook result - checking og:image first');
       const metatags = pagemap['metatags'];
       
       if (Array.isArray(metatags) && metatags.length > 0) {
@@ -355,10 +504,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           const imageUrl = tryGetImageUrl(meta['og:image']);
           // Only use og:image if it's NOT a lookaside URL (those return HTML redirects)
           if (imageUrl && !imageUrl.includes('lookaside')) {
-            console.log('✅ Using Facebook og:image (high quality):', imageUrl);
             return imageUrl;
-          } else if (imageUrl && imageUrl.includes('lookaside')) {
-            console.log('⚠️ og:image is lookaside URL (returns HTML), will try cse_thumbnail instead');
           }
         }
       }
@@ -366,10 +512,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     // For Facebook, prefer cse_thumbnail (Google's cached version) over cse_image (lookaside)
     if (result.source_site.includes('facebook') && pagemap['cse_thumbnail']) {
-      console.log('🔍 Facebook - trying cse_thumbnail (Google CDN)');
       const imageUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
       if (imageUrl) {
-        console.log('✅ Using Facebook cse_thumbnail (Google CDN):', imageUrl);
         return imageUrl;
       }
     }
@@ -377,24 +521,19 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     // For Instagram, SKIP lookaside URLs (they return HTML like Facebook)
     // Instagram lookaside URLs: https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=...
     if (result.source_site.includes('instagram')) {
-      console.log('🔍 Instagram result - checking for lookaside URLs');
-      
       // Check if cse_image is a lookaside URL
       if (pagemap['cse_image']) {
         const imageUrl = tryGetImageUrl(pagemap['cse_image']);
         if (imageUrl && imageUrl.includes('lookaside.instagram.com')) {
-          console.log('⚠️ Instagram cse_image is lookaside URL (returns HTML), will use cse_thumbnail instead');
           // Skip lookaside, try cse_thumbnail
           if (pagemap['cse_thumbnail']) {
             const thumbnailUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
             if (thumbnailUrl) {
-              console.log('✅ Using Instagram cse_thumbnail (Google CDN):', thumbnailUrl);
               return thumbnailUrl;
             }
           }
         } else if (imageUrl && !imageUrl.includes('lookaside')) {
           // Not a lookaside URL, try to use it (might be direct cdninstagram.com, but might get 403)
-          console.log('✅ Using Instagram cse_image (non-lookaside):', imageUrl);
           return imageUrl;
         }
       }
@@ -403,7 +542,6 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       if (pagemap['cse_thumbnail']) {
         const thumbnailUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
         if (thumbnailUrl) {
-          console.log('✅ Using Instagram cse_thumbnail (Google CDN fallback):', thumbnailUrl);
           return thumbnailUrl;
         }
       }
@@ -411,38 +549,31 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     // 1. Check cse_image (most common - for non-Instagram/Facebook)
     if (pagemap['cse_image']) {
-      console.log('✓ Found cse_image field:', pagemap['cse_image']);
       const imageUrl = tryGetImageUrl(pagemap['cse_image']);
       if (imageUrl) {
-        console.log('✅ Using cse_image:', imageUrl);
         return imageUrl;
       }
     }
     
     // 2. Check cse_thumbnail
     if (pagemap['cse_thumbnail']) {
-      console.log('✓ Found cse_thumbnail field:', pagemap['cse_thumbnail']);
       const imageUrl = tryGetImageUrl(pagemap['cse_thumbnail']);
       if (imageUrl) {
-        console.log('✅ Using cse_thumbnail:', imageUrl);
         return imageUrl;
       }
     }
     
     // 3. Check metatags (Facebook priority)
     if (pagemap['metatags']) {
-      console.log('✓ Found metatags field:', pagemap['metatags']);
       const metatags = pagemap['metatags'];
       
       if (Array.isArray(metatags) && metatags.length > 0) {
         const meta = metatags[0] as Record<string, unknown>;
-        console.log('  Metatags keys:', Object.keys(meta));
         
         // Try og:image (Open Graph)
         if (meta['og:image']) {
           const imageUrl = tryGetImageUrl(meta['og:image']);
           if (imageUrl) {
-            console.log('✅ Using og:image:', imageUrl);
             return imageUrl;
           }
         }
@@ -451,7 +582,6 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         if (meta['twitter:image']) {
           const imageUrl = tryGetImageUrl(meta['twitter:image']);
           if (imageUrl) {
-            console.log('✅ Using twitter:image:', imageUrl);
             return imageUrl;
           }
         }
@@ -460,7 +590,6 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         if (meta['twitter:image:src']) {
           const imageUrl = tryGetImageUrl(meta['twitter:image:src']);
           if (imageUrl) {
-            console.log('✅ Using twitter:image:src:', imageUrl);
             return imageUrl;
           }
         }
@@ -469,31 +598,26 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     
     // 4. Check imageobject (structured data)
     if (pagemap['imageobject']) {
-      console.log('✓ Found imageobject field:', pagemap['imageobject']);
       const imageUrl = tryGetImageUrl(pagemap['imageobject']);
       if (imageUrl) {
-        console.log('✅ Using imageobject:', imageUrl);
         return imageUrl;
       }
     }
     
     // 5. Check webpage images
     if (pagemap['webpage']) {
-      console.log('✓ Found webpage field:', pagemap['webpage']);
       const webpage = pagemap['webpage'];
       if (Array.isArray(webpage) && webpage.length > 0) {
         const page = webpage[0] as Record<string, unknown>;
         if (page['image']) {
           const imageUrl = tryGetImageUrl(page['image']);
           if (imageUrl) {
-            console.log('✅ Using webpage image:', imageUrl);
             return imageUrl;
           }
         }
       }
     }
     
-    console.log('❌ No image found in pagemap for:', result.source_site);
     return null;
   };
 
@@ -510,7 +634,6 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                       imageUrl.includes('instagram.com');
     
     if (needsProxy) {
-      console.log('🔄 Using proxy for:', imageUrl);
       // Use full backend URL for proxy
       const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
       return `${backendUrl}/api/v1/proxy-image?url=${encodeURIComponent(imageUrl)}`;
@@ -523,6 +646,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   const renderResultCard = (result: SocialSearchResult, index: number, totalInTab: number) => {
     const imageUrl = getImageFromResult(result);
     const proxiedImageUrl = imageUrl ? getProxiedImageUrl(imageUrl, result.source_site) : null;
+    const isSelected = selectedItems.has(result.link);
     
     return (
       <Card 
@@ -530,6 +654,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         variant="outlined" 
         sx={{ 
           transition: 'all 0.2s',
+          border: isSelected ? 2 : 1,
+          borderColor: isSelected ? 'primary.main' : 'divider',
           '&:hover': { 
             boxShadow: 3,
             transform: 'translateY(-2px)',
@@ -538,6 +664,16 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       >
         <CardContent>
           <Box sx={{ display: 'flex', gap: 2 }}>
+            {/* Selection Checkbox */}
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', pt: 0.5 }}>
+              <Checkbox
+                checked={isSelected}
+                onChange={() => handleToggleSelection(result.link)}
+                size="small"
+                sx={{ p: 0 }}
+              />
+            </Box>
+
             {/* Left side - Image (if available) */}
             {proxiedImageUrl && (
               <Box
@@ -631,8 +767,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                 {result.snippet}
               </Typography>
 
-              {/* View Details Button */}
-              <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
+              {/* View Details Button with Cache Indicators */}
+              <Box sx={{ mt: 1, display: 'flex', gap: 1, alignItems: 'center' }}>
                 <Button
                   variant="outlined"
                   size="small"
@@ -642,6 +778,29 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                 >
                   {loadingContent === result.link ? 'Loading...' : 'View Full Content'}
                 </Button>
+                
+                {/* Cache Status Indicators */}
+                {cacheStatus[result.link]?.content_cached && (
+                  <Tooltip title="Content Cached - Already fetched">
+                    <CheckCircleIcon 
+                      sx={{ 
+                        color: 'success.main', 
+                        fontSize: 20 
+                      }} 
+                    />
+                  </Tooltip>
+                )}
+                
+                {cacheStatus[result.link]?.analysis_cached && (
+                  <Tooltip title="AI Analysis Cached - Already analyzed">
+                    <PsychologyIcon 
+                      sx={{ 
+                        color: 'primary.main', 
+                        fontSize: 20 
+                      }} 
+                    />
+                  </Tooltip>
+                )}
               </Box>
             </Box>
           </Box>
@@ -721,11 +880,45 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* YouTube Tab */}
         <TabPanel value={activeTab} index={0}>
           {youtubeResults.length > 0 ? (
-            <Stack spacing={2}>
-              {youtubeResults.map((result, index) => 
-                renderResultCard(result, index, youtubeResults.length)
-              )}
-            </Stack>
+            <>
+              {/* Export Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleSelectAll(youtubeResults)}
+                  disabled={exporting}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleDeselectAll(youtubeResults)}
+                  disabled={exporting || selectedItems.size === 0}
+                >
+                  Deselect All
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                  onClick={() => handleExport(youtubeResults, 'YouTube')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting...' : 
+                   selectedItems.size > 0 ? `Export Selected (${selectedItems.size})` : 
+                   `Export All (${youtubeResults.length})`}
+                </Button>
+              </Box>
+              
+              <Stack spacing={2}>
+                {youtubeResults.map((result, index) => 
+                  renderResultCard(result, index, youtubeResults.length)
+                )}
+              </Stack>
+            </>
           ) : (
             <Alert severity="info">
               No YouTube results found for this query.
@@ -736,11 +929,45 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* Twitter Tab */}
         <TabPanel value={activeTab} index={1}>
           {twitterResults.length > 0 ? (
-            <Stack spacing={2}>
-              {twitterResults.map((result, index) => 
-                renderResultCard(result, index, twitterResults.length)
-              )}
-            </Stack>
+            <>
+              {/* Export Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleSelectAll(twitterResults)}
+                  disabled={exporting}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleDeselectAll(twitterResults)}
+                  disabled={exporting || selectedItems.size === 0}
+                >
+                  Deselect All
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                  onClick={() => handleExport(twitterResults, 'Twitter')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting...' : 
+                   selectedItems.size > 0 ? `Export Selected (${selectedItems.size})` : 
+                   `Export All (${twitterResults.length})`}
+                </Button>
+              </Box>
+              
+              <Stack spacing={2}>
+                {twitterResults.map((result, index) => 
+                  renderResultCard(result, index, twitterResults.length)
+                )}
+              </Stack>
+            </>
           ) : (
             <Alert severity="info">
               No Twitter/X results found for this query.
@@ -751,11 +978,45 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* Facebook Tab */}
         <TabPanel value={activeTab} index={2}>
           {facebookResults.length > 0 ? (
-            <Stack spacing={2}>
-              {facebookResults.map((result, index) => 
-                renderResultCard(result, index, facebookResults.length)
-              )}
-            </Stack>
+            <>
+              {/* Export Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleSelectAll(facebookResults)}
+                  disabled={exporting}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleDeselectAll(facebookResults)}
+                  disabled={exporting || selectedItems.size === 0}
+                >
+                  Deselect All
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                  onClick={() => handleExport(facebookResults, 'Facebook')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting...' : 
+                   selectedItems.size > 0 ? `Export Selected (${selectedItems.size})` : 
+                   `Export All (${facebookResults.length})`}
+                </Button>
+              </Box>
+              
+              <Stack spacing={2}>
+                {facebookResults.map((result, index) => 
+                  renderResultCard(result, index, facebookResults.length)
+                )}
+              </Stack>
+            </>
           ) : (
             <Alert severity="info">
               No Facebook results found for this query.
@@ -766,11 +1027,45 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* Instagram Tab */}
         <TabPanel value={activeTab} index={3}>
           {instagramResults.length > 0 ? (
-            <Stack spacing={2}>
-              {instagramResults.map((result, index) => 
-                renderResultCard(result, index, instagramResults.length)
-              )}
-            </Stack>
+            <>
+              {/* Export Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleSelectAll(instagramResults)}
+                  disabled={exporting}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleDeselectAll(instagramResults)}
+                  disabled={exporting || selectedItems.size === 0}
+                >
+                  Deselect All
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                  onClick={() => handleExport(instagramResults, 'Instagram')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting...' : 
+                   selectedItems.size > 0 ? `Export Selected (${selectedItems.size})` : 
+                   `Export All (${instagramResults.length})`}
+                </Button>
+              </Box>
+              
+              <Stack spacing={2}>
+                {instagramResults.map((result, index) => 
+                  renderResultCard(result, index, instagramResults.length)
+                )}
+              </Stack>
+            </>
           ) : (
             <Alert severity="info">
               No Instagram results found for this query.
@@ -792,14 +1087,14 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         {/* Footer */}
         <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
           <Typography variant="caption" color="text.secondary" align="center" display="block">
-            💡 Tip: Switch tabs to see results from different platforms. Click "View Full Content" to see detailed information and analyse with AI.
+            💡 Tip: Select items and click Export to save data to Excel. Items with cached content and AI analysis will include full details in the export.
           </Typography>
         </Box>
       </Paper>
 
       {/* Error Snackbar Toast */}
       <Snackbar
-        open={snackbarOpen}
+        open={snackbarOpen && !exportSuccess}
         autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
@@ -809,11 +1104,24 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         </Alert>
       </Snackbar>
 
+      {/* Success Snackbar Toast */}
+      <Snackbar
+        open={exportSuccess}
+        autoHideDuration={3000}
+        onClose={() => setExportSuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setExportSuccess(false)} severity="success" sx={{ width: '100%' }}>
+          Successfully exported {selectedItems.size === 0 ? 'all' : selectedItems.size} item(s) to Excel!
+        </Alert>
+      </Snackbar>
+
       {/* Social Content Modal */}
       <SocialContentModal
         open={modalOpen}
         onClose={handleCloseModal}
         content={selectedContent}
+        onCacheUpdate={checkCacheStatus}
         llmModel={(() => {
           // Read LLM config from localStorage (same as LLMConfigDropdown)
           try {

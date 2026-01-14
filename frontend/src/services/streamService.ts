@@ -40,7 +40,6 @@ export class StreamService {
     params.append('llm_model', llmConfig.model);
 
     const url = `${this.baseURL}/api/v1/search/stream?${params.toString()}`;
-    console.log('[STREAM] Opening SSE connection:', url);
 
     this.eventSource = new EventSource(url);
 

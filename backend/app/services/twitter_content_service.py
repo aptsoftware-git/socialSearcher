@@ -1,6 +1,7 @@
 """
 Twitter/X Content Service - Fetch full tweet details using Twitter API v2.
 Uses OAuth 2.0 Bearer Token authentication (simpler, same rate limits as OAuth 1.0a on FREE tier).
+Supports third-party scraping via ScrapeCreators API (configurable via TWITTER_SCRAPER env variable).
 """
 
 from typing import Optional, Dict, Any, List
@@ -17,6 +18,7 @@ from app.models import (
     SocialContentMedia,
     SocialContentEngagement
 )
+from app.services.scrapecreators_service import scrapecreators_service
 
 
 class TwitterContentService:
@@ -79,7 +81,7 @@ class TwitterContentService:
     async def get_tweet_content(self, url: str) -> Optional[SocialFullContent]:
         """
         Fetch full tweet details from Twitter API v2 with retry logic.
-        Uses OAuth 2.0 Bearer Token authentication.
+        Uses OAuth 2.0 Bearer Token authentication or ScrapeCreators API based on TWITTER_SCRAPER setting.
         
         Args:
             url: Twitter/X tweet URL
@@ -87,6 +89,27 @@ class TwitterContentService:
         Returns:
             SocialFullContent with tweet details or None if error
         """
+        # Check if we should use ScrapeCreators API instead
+        if settings.twitter_scraper.upper() == "SCRAPECREATORS":
+            logger.info("🔄 Using ScrapeCreators API for Twitter content")
+            scrapecreators_data = await scrapecreators_service.get_twitter_content(url)
+            if scrapecreators_data:
+                # Log raw_data to see what ScrapeCreators actually returned
+                if "raw_data" in scrapecreators_data:
+                    raw_data = scrapecreators_data["raw_data"]
+                    logger.info(f"🔍 raw_data top-level keys: {list(raw_data.keys())[:20]}")
+                    if "user" in raw_data:
+                        logger.info(f"🔍 raw_data['user'] keys: {list(raw_data['user'].keys())[:15] if isinstance(raw_data['user'], dict) else 'not dict'}")
+                    if "author" in raw_data:
+                        logger.info(f"🔍 raw_data['author']: {raw_data['author']}")
+                return self._convert_scrapecreators_to_model(scrapecreators_data)
+            else:
+                logger.warning("⚠️ ScrapeCreators failed, falling back to native Twitter API")
+                # Fall through to native API
+        
+        # Use native Twitter API (OAuth 2.0)
+        logger.info("🔄 Using native Twitter API (OAuth 2.0)")
+        
         # Check authentication
         if not self.bearer_token:
             logger.error("Twitter API Bearer Token not configured")
@@ -296,3 +319,85 @@ class TwitterContentService:
         # If we exit the loop without returning
         logger.error(f"Failed to fetch tweet {tweet_id} after {self.max_retries} attempts")
         return None
+    
+    def _convert_scrapecreators_to_model(self, data: Dict[str, Any]) -> Optional[SocialFullContent]:
+        """
+        Convert ScrapeCreators formatted data to SocialFullContent model.
+        
+        Args:
+            data: Formatted data from ScrapeCreators service
+        
+        Returns:
+            SocialFullContent model instance
+        """
+        try:
+            # Debug log to see data structure
+            logger.info(f"📊 ScrapeCreators Twitter data keys: {list(data.keys())}")
+            
+            # Extract author info
+            author_data = data.get("author", {})
+            logger.info(f"👤 Author data: {author_data}")
+            
+            author = SocialContentAuthor(
+                name=author_data.get("name", "Unknown"),
+                username=author_data.get("username", "unknown"),
+                profile_picture=author_data.get("profile_image", ""),
+                verified=author_data.get("verified", False),
+                additional_info={
+                    'followers': author_data.get("followers", 0)
+                }
+            )
+            
+            # Extract media
+            media_list = []
+            logger.info(f"🖼️ Processing {len(data.get('media', []))} media items from ScrapeCreators")
+            for m in data.get("media", []):
+                media_type = m.get("type", "image")
+                media_url = m.get("url", "")
+                logger.info(f"  Media: type={media_type}, url={'present' if media_url else 'EMPTY'}")
+                media_list.append(
+                    SocialContentMedia(
+                        type=media_type,
+                        url=media_url,
+                        thumbnail_url=m.get("thumbnail", ""),
+                        width=None,
+                        height=None,
+                        duration_ms=None
+                    )
+                )
+            
+            # Extract metrics
+            metrics = data.get("metrics", {})
+            engagement = SocialContentEngagement(
+                likes=metrics.get("likes", 0),
+                comments=metrics.get("replies", 0),
+                shares=metrics.get("retweets", 0),
+                views=metrics.get("views", 0),
+                additional_metrics={
+                    'quotes': metrics.get("quotes", 0)
+                }
+            )
+            
+            # Create SocialFullContent
+            content = SocialFullContent(
+                platform="twitter",
+                platform_id=data.get("tweet_id", "unknown"),
+                url=data.get("url", ""),
+                content_type=data.get("content_type", "text"),
+                text=data.get("text", ""),
+                media=media_list,
+                author=author,
+                engagement=engagement,
+                posted_at=data.get("timestamp") or datetime.utcnow(),
+                platform_data={
+                    'scraper': 'scrapecreators',
+                    'raw_data': data.get("raw_data", {})
+                }
+            )
+            
+            logger.info("✅ Converted ScrapeCreators data to SocialFullContent model")
+            return content
+            
+        except Exception as e:
+            logger.error(f"❌ Error converting ScrapeCreators data to model: {e}")
+            return None
