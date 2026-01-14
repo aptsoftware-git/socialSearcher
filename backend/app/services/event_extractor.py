@@ -234,8 +234,8 @@ JSON OUTPUT (extract from THIS article):"""
             return data
             
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse LLM response as JSON: {e}")
-            logger.error(f"Full response was:\n{response}")
+            # logger.error(f"Failed to parse LLM response as JSON: {e}")
+            # logger.error(f"Full response was:\n{response}")
             # Try to salvage partial data by being more aggressive
             try:
                 # Remove comments if any
@@ -243,10 +243,10 @@ JSON OUTPUT (extract from THIS article):"""
                 cleaned_lines = [line.split('//')[0] for line in lines]  # Remove // comments
                 cleaned = '\n'.join(cleaned_lines)
                 data = json.loads(cleaned)
-                logger.info("Successfully parsed after removing comments")
+                # logger.info("Successfully parsed after removing comments")
                 return data
             except:
-                logger.error("Could not salvage JSON even after cleanup")
+                # logger.error("Could not salvage JSON even after cleanup")
                 return None
         except Exception as e:
             logger.error(f"Error parsing LLM response: {e}")
@@ -309,7 +309,7 @@ JSON OUTPUT (extract from THIS article):"""
                     return et
         
         # Default to other
-        logger.warning(f"Unknown event type '{event_type}', defaulting to 'other'")
+        # logger.warning(f"Unknown event type '{event_type}', defaulting to 'other'")
         return EventType.OTHER
     
     def validate_perpetrator_type(self, perpetrator_type: str) -> Optional['PerpetratorType']:
@@ -412,11 +412,11 @@ JSON OUTPUT (extract from THIS article):"""
                 readable = sum(c.isalnum() or c.isspace() or c in '.,!?;:()-"\'' for c in content[:1000])
                 ratio = readable / min(1000, len(content))
                 if ratio < 0.30:  # Lowered from 0.40 - try to salvage more articles
-                    logger.warning(f"Content quality too low for LLM ({ratio:.1%} readable) - skipping extraction")
-                    logger.debug(f"Sample: {content[:200]!r}")
+                    # logger.warning(f"Content quality too low for LLM ({ratio:.1%} readable) - skipping extraction")
+                    # logger.debug(f"Sample: {content[:200]!r}")
                     return None, {}
                 elif ratio < 0.50:  # Lowered from 0.60
-                    logger.warning(f"Content quality marginal ({ratio:.1%} readable) - LLM may struggle")
+                    pass  # logger.warning(f"Content quality marginal ({ratio:.1%} readable) - LLM may struggle")
                     # Clean corrupted content more aggressively
                     # Remove null bytes, replacement chars, and control characters
                     content = ''.join(c for c in content if c.isprintable() or c.isspace())
@@ -476,7 +476,7 @@ Return ONLY valid JSON matching the schema provided."""
                 has_violence_mention = any(keyword in title_lower or keyword in content_lower for keyword in violence_keywords)
                 
                 if not has_violence_mention:
-                    logger.warning(f"⚠️ Event type '{event_type_str}' doesn't match article content. Changing to 'other' for: {title[:60]}")
+                    # logger.warning(f"Event type '{event_type_str}' doesn't match article content. Changing to 'other' for: {title[:60]}")
                     parsed_data["event_type"] = "other"
                     # Clear violence-related fields
                     parsed_data["perpetrator"] = None
@@ -486,7 +486,7 @@ Return ONLY valid JSON matching the schema provided."""
             # Validate confidence score - reject ONLY if extremely low
             confidence = parsed_data.get("confidence", 0.0)
             if confidence < 0.3:
-                logger.warning(f"❌ Rejecting extraction: confidence too low ({confidence:.2f}) for: {title[:60]}")
+                # logger.warning(f"Rejecting extraction: confidence too low ({confidence:.2f}) for: {title[:60]}")
                 return None, metadata
             
             # Extract location components
@@ -652,7 +652,7 @@ Return ONLY valid JSON matching the schema provided."""
             )
             
             logger.info(
-                f"✅ Extracted event: {event_data.event_type.value} | "
+                f"Extracted event: {event_data.event_type.value} | "
                 f"{event_data.title[:40]}... | "
                 f"Location: {event_data.location} | "
                 f"Confidence: {event_data.confidence:.2f} | "
@@ -737,7 +737,7 @@ Return ONLY valid JSON matching the schema provided."""
                 events.append(event)
                 metadata_list.append(metadata)
         
-        logger.info(f"✅ Successfully extracted {len(events)}/{len(articles)} events")
+        logger.info(f"Successfully extracted {len(events)}/{len(articles)} events")
         return events, metadata_list
     
     def is_available(self) -> bool:

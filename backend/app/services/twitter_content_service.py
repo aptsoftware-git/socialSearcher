@@ -33,7 +33,7 @@ class TwitterContentService:
         self.max_retries = 3
         self.base_retry_delay = 15  # seconds
         
-        logger.info("🔐 Twitter: Using OAuth 2.0 (Bearer Token)")
+        logger.info("Twitter: Using OAuth 2.0 (Bearer Token)")
         
     def _log_rate_limit_info(self, headers: Dict[str, str]):
         """Log rate limit information from response headers."""
@@ -44,16 +44,16 @@ class TwitterContentService:
             if self.rate_limit_remaining:
                 remaining = int(self.rate_limit_remaining)
                 # Note: FREE tier has 1 request/15min, Basic has 15/15min, Pro has 450-900/15min
-                logger.info(f"🐦 Twitter API remaining: {remaining} requests")
+                logger.info(f"Twitter API remaining: {remaining} requests")
                 
                 if remaining <= 0:
-                    logger.error(f"🚨 Twitter rate limit exhausted: {remaining} requests remaining!")
+                    logger.error(f"Twitter rate limit exhausted: {remaining} requests remaining!")
                 elif remaining <= 5:
-                    logger.warning(f"⚠️ Twitter rate limit low: {remaining} requests remaining")
+                    logger.warning(f"Twitter rate limit low: {remaining} requests remaining")
                     
             if self.rate_limit_reset:
                 reset_time = datetime.fromtimestamp(int(self.rate_limit_reset))
-                logger.info(f"🔄 Twitter rate limit resets at: {reset_time.strftime('%H:%M:%S')}")
+                logger.info(f"Twitter rate limit resets at: {reset_time.strftime('%H:%M:%S')}")
         except Exception as e:
             logger.debug(f"Could not parse rate limit headers: {e}")
         
@@ -91,24 +91,24 @@ class TwitterContentService:
         """
         # Check if we should use ScrapeCreators API instead
         if settings.twitter_scraper.upper() == "SCRAPECREATORS":
-            logger.info("🔄 Using ScrapeCreators API for Twitter content")
+            logger.info("Using ScrapeCreators API for Twitter content")
             scrapecreators_data = await scrapecreators_service.get_twitter_content(url)
             if scrapecreators_data:
                 # Log raw_data to see what ScrapeCreators actually returned
                 if "raw_data" in scrapecreators_data:
                     raw_data = scrapecreators_data["raw_data"]
-                    logger.info(f"🔍 raw_data top-level keys: {list(raw_data.keys())[:20]}")
-                    if "user" in raw_data:
-                        logger.info(f"🔍 raw_data['user'] keys: {list(raw_data['user'].keys())[:15] if isinstance(raw_data['user'], dict) else 'not dict'}")
-                    if "author" in raw_data:
-                        logger.info(f"🔍 raw_data['author']: {raw_data['author']}")
+                    # logger.debug(f"raw_data top-level keys: {list(raw_data.keys())[:20]}")
+                    # if "user" in raw_data:
+                    #     logger.debug(f"raw_data['user'] keys: {list(raw_data['user'].keys())[:15] if isinstance(raw_data['user'], dict) else 'not dict'}")
+                    # if "author" in raw_data:
+                    #     logger.debug(f"raw_data['author']: {raw_data['author']}")
                 return self._convert_scrapecreators_to_model(scrapecreators_data)
             else:
-                logger.warning("⚠️ ScrapeCreators failed, falling back to native Twitter API")
+                logger.warning("ScrapeCreators failed, falling back to native Twitter API")
                 # Fall through to native API
         
         # Use native Twitter API (OAuth 2.0)
-        logger.info("🔄 Using native Twitter API (OAuth 2.0)")
+        logger.info("Using native Twitter API (OAuth 2.0)")
         
         # Check authentication
         if not self.bearer_token:
@@ -167,7 +167,7 @@ class TwitterContentService:
                             
                             # If reset is far away (>1 min), log warning but still try retry with backoff
                             logger.warning(
-                                f"⚠️ Twitter rate limit hit (429). "
+                                f"Twitter rate limit hit (429). "
                                 f"Rate limit resets at: {reset_time.strftime('%H:%M:%S')} "
                                 f"(in {int(wait_until_reset / 60)} minutes {int(wait_until_reset % 60)} seconds)"
                             )
@@ -192,12 +192,12 @@ class TwitterContentService:
                             if self.rate_limit_reset:
                                 reset_time = datetime.fromtimestamp(int(self.rate_limit_reset))
                                 logger.error(
-                                    f"🚨 Twitter rate limit exceeded. Max retries ({self.max_retries}) reached. "
+                                    f"Twitter rate limit exceeded. Max retries ({self.max_retries}) reached. "
                                     f"Rate limit resets at: {reset_time.strftime('%H:%M:%S')}. "
                                     f"Content is cached and will be available for 24 hours."
                                 )
                             else:
-                                logger.error(f"🚨 Twitter rate limit exceeded. Max retries ({self.max_retries}) reached.")
+                                logger.error(f"Twitter rate limit exceeded. Max retries ({self.max_retries}) reached.")
                             return None
                     
                     response.raise_for_status()
@@ -332,11 +332,11 @@ class TwitterContentService:
         """
         try:
             # Debug log to see data structure
-            logger.info(f"📊 ScrapeCreators Twitter data keys: {list(data.keys())}")
+            # logger.debug(f"ScrapeCreators Twitter data keys: {list(data.keys())}")
             
             # Extract author info
             author_data = data.get("author", {})
-            logger.info(f"👤 Author data: {author_data}")
+            # logger.debug(f"Author data: {author_data}")
             
             author = SocialContentAuthor(
                 name=author_data.get("name", "Unknown"),
@@ -350,7 +350,7 @@ class TwitterContentService:
             
             # Extract media
             media_list = []
-            logger.info(f"🖼️ Processing {len(data.get('media', []))} media items from ScrapeCreators")
+            # logger.debug(f"Processing {len(data.get('media', []))} media items from ScrapeCreators")
             for m in data.get("media", []):
                 media_type = m.get("type", "image")
                 media_url = m.get("url", "")
@@ -395,9 +395,9 @@ class TwitterContentService:
                 }
             )
             
-            logger.info("✅ Converted ScrapeCreators data to SocialFullContent model")
+            logger.info("Converted ScrapeCreators data to SocialFullContent model")
             return content
             
         except Exception as e:
-            logger.error(f"❌ Error converting ScrapeCreators data to model: {e}")
+            logger.error(f"Error converting ScrapeCreators data to model: {e}")
             return None

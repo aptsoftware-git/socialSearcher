@@ -63,10 +63,10 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 # Download spaCy language model (will be needed in Increment 4)
-# Note: May have compatibility issues with Python 3.13, can skip for now
-python -m spacy download en_core_web_sm
+# Note: If 'python -m spacy download' fails with 404 error, use direct wheel installation below
+# python -m spacy download en_core_web_sm
 
-#If there are issues with spaCy installation -
+# Direct wheel installation (recommended if download command fails):
 pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.7.1/en_core_web_sm-3.7.1-py3-none-any.whl
 ```
 

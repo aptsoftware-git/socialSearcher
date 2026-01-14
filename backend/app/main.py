@@ -51,7 +51,7 @@ app = FastAPI(
 
 # CORS Configuration
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(',')] if settings.cors_origins else ["http://localhost:5173"]
-logger.info(f"CORS origins: {cors_origins}")
+# logger.info(f"CORS origins: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,19 +70,19 @@ async def startup_event():
     """Initialize services on startup."""
     global ollama_client
     
-    logger.info("Starting Event Scraper API...")
-    logger.info(f"Ollama URL: {settings.ollama_url}")
-    logger.info(f"Ollama Model: {settings.ollama_model}")
+    # logger.info("Starting Event Scraper API...")
+    # logger.info(f"Ollama URL: {settings.ollama_url}")
+    # logger.info(f"Ollama Model: {settings.ollama_model}")
     
     # Log social media API configuration status
-    logger.info("=== Social Media API Configuration ===")
-    logger.info(f"YouTube API: {'✓ Configured' if settings.youtube_api_key else '✗ Not configured'}")
-    logger.info(f"Facebook API: {'✓ Configured' if settings.facebook_access_token else '✗ Not configured'}")
-    if settings.facebook_access_token:
-        logger.info(f"  Token: {settings.facebook_access_token[:20]}...")
-    logger.info(f"Twitter API: {'✓ Configured' if settings.twitter_bearer_token else '✗ Not configured'}")
-    logger.info(f"Instagram API: {'✓ Configured' if settings.instagram_access_token else '✗ Not configured'}")
-    logger.info("=======================================")
+    # logger.info("=== Social Media API Configuration ===")
+    # logger.info(f"YouTube API: {'✓ Configured' if settings.youtube_api_key else '✗ Not configured'}")
+    # logger.info(f"Facebook API: {'✓ Configured' if settings.facebook_access_token else '✗ Not configured'}")
+    # if settings.facebook_access_token:
+    #     logger.info(f"  Token: {settings.facebook_access_token[:20]}...")
+    # logger.info(f"Twitter API: {'✓ Configured' if settings.twitter_bearer_token else '✗ Not configured'}")
+    # logger.info(f"Instagram API: {'✓ Configured' if settings.instagram_access_token else '✗ Not configured'}")
+    # logger.info("=======================================")
     
     # Initialize Ollama client
     try:
@@ -90,7 +90,7 @@ async def startup_event():
             base_url=settings.ollama_url,
             default_model=settings.ollama_model
         )
-        logger.info("Ollama client initialized successfully")
+        # logger.info("Ollama client initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize Ollama client: {e}")
         logger.warning("API will start but Ollama features may not work")
@@ -98,7 +98,7 @@ async def startup_event():
     # Load source configurations
     try:
         sources = config_manager.load_sources()
-        logger.info(f"Loaded {len(sources)} sources ({config_manager.get_enabled_count()} enabled)")
+        # logger.info(f"Loaded {len(sources)} sources ({config_manager.get_enabled_count()} enabled)")
     except FileNotFoundError:
         logger.warning("sources.yaml not found - create it in config/ directory")
     except Exception as e:
@@ -108,7 +108,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown."""
-    logger.info("Shutting down Event Scraper API...")
+    # logger.info("Shutting down Event Scraper API...")
 
 
 # Health Check Endpoints
@@ -343,7 +343,7 @@ async def social_search(request: SocialSearchRequest):
         ```
     """
     try:
-        logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']}")
+        # logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']}")
         
         # Execute social search
         results = await social_search_service.search(
@@ -397,7 +397,7 @@ async def fetch_social_content(request: FetchContentRequest):
         ```
     """
     try:
-        logger.info(f"Fetch content request: {request.platform} - {request.url}")
+        # logger.info(f"Fetch content request: {request.platform} - {request.url}")
         
         # Fetch content using aggregator (with caching)
         content = await social_content_aggregator.fetch_content(
@@ -510,7 +510,7 @@ async def analyse_social_content(request: AnalyseContentRequest):
     """
     try:
         start_time = datetime.utcnow()
-        logger.info(f"Analysing {request.content.platform} content: {request.content.url}")
+        # logger.info(f"Analysing {request.content.platform} content: {request.content.url}")
         
         # Check cache first for existing analysis
         cached_event = social_content_aggregator.get_cached_analysis(
@@ -520,7 +520,7 @@ async def analyse_social_content(request: AnalyseContentRequest):
         
         if cached_event:
             # Return cached analysis
-            logger.info(f"✅ Returning cached analysis for: {request.content.url}")
+            # logger.info(f"✅ Returning cached analysis for: {request.content.url}")
             return AnalyseContentResponse(
                 status="success",
                 event=cached_event,
@@ -563,7 +563,7 @@ async def analyse_social_content(request: AnalyseContentRequest):
             else:
                 provider_to_use = "ollama"
         
-        logger.info(f"Extracting event using LLM provider: {provider_to_use or 'default'}, model: {model_to_use or 'default'}")
+        # logger.info(f"Extracting event using LLM provider: {provider_to_use or 'default'}, model: {model_to_use or 'default'}")
         
         # Call event_extractor with proper parameters
         event_tuple = await event_extractor.extract_event(
@@ -670,7 +670,7 @@ async def proxy_image(url: str):
         GET /api/v1/proxy-image?url=https://external.xx.fbcdn.net/...
     """
     try:
-        logger.debug(f"Proxying image: {url}")
+        # logger.debug(f"Proxying image: {url}")
         
         # Validate URL to prevent abuse
         allowed_domains = [
@@ -718,8 +718,8 @@ async def proxy_image(url: str):
             
             # Log response details
             content_length = len(response.content)
-            logger.info(f"Fetched image: {content_length} bytes, status: {response.status_code}, final URL: {response.url}")
-            logger.debug(f"Response headers: {dict(response.headers)}")
+            # logger.info(f"Fetched image: {content_length} bytes, status: {response.status_code}, final URL: {response.url}")
+            # logger.debug(f"Response headers: {dict(response.headers)}")
             
             # If response is suspiciously small, log warning
             if content_length < 1000:
@@ -740,7 +740,7 @@ async def proxy_image(url: str):
                 else:
                     content_type = 'image/jpeg'  # Default to JPEG
             
-            logger.debug(f"Serving image with content-type: {content_type}")
+            # logger.debug(f"Serving image with content-type: {content_type}")
             
             # Return image with comprehensive CORS headers to prevent ORB blocking
             return Response(
@@ -1252,15 +1252,13 @@ async def export_social_events(
         # Debug: Log first item to see structure
         if items_dict:
             first_item = items_dict[0]
-            logger.info(f"First item URL: {first_item.get('url', 'N/A')[:50]}...")
-            logger.info(f"First item - cached_content: {first_item.get('cached_content') is not None}")
-            logger.info(f"First item - cached_analysis: {first_item.get('cached_analysis') is not None}")
+            # logger.info(f"First item URL: {first_item.get('url', 'N/A')[:50]}...")
+            # logger.info(f"First item - cached_content: {first_item.get('cached_content') is not None}")
+            # logger.info(f"First item - cached_analysis: {first_item.get('cached_analysis') is not None}")
             if first_item.get('cached_analysis'):
                 analysis = first_item['cached_analysis']
-                logger.info(f"Analysis title: {analysis.get('title', 'N/A')[:80]}...")
-                logger.info(f"Analysis event_type: {analysis.get('event_type', 'N/A')}")
-        
-        # Generate Excel file
+                # logger.info(f"Analysis title: {analysis.get('title', 'N/A')[:80]}...")
+                # logger.info(f"Analysis event_type: {analysis.get('event_type', 'N/A')}") pass        # Generate Excel file
         excel_bytes = excel_exporter.export_social_events_to_excel(
             items=items_dict,
             platform_filter=request.platform_filter
@@ -1271,7 +1269,7 @@ async def export_social_events(
         platform_name = request.platform_filter.lower() if request.platform_filter else "social"
         filename = f"{platform_name}_events_{timestamp}.xlsx"
         
-        logger.info(f"Generated social export file: {filename}")
+        # logger.info(f"Generated social export file: {filename}")
         
         # Return as streaming response
         return StreamingResponse(
@@ -1312,7 +1310,7 @@ async def extract_event_from_text(article: ArticleContent):
         )
     
     try:
-        logger.info(f"Extracting event from article: {article.title[:50]}...")
+        # logger.info(f"Extracting event from article: {article.title[:50]}...")
         
         event_data = await event_extractor.extract_from_article(article)
         
@@ -1355,7 +1353,7 @@ async def extract_event_simple(
         )
     
     try:
-        logger.info(f"Extracting event from: {title[:50]}...")
+        # logger.info(f"Extracting event from: {title[:50]}...")
         
         event_data = await event_extractor.extract_event(
             title=title,

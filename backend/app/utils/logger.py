@@ -35,6 +35,6 @@ def setup_logging():
         compression="zip"
     )
     
-    logger.info("Logging configured successfully")
-    logger.info(f"Log level: {settings.log_level}")
-    logger.info(f"Log file: {settings.log_file}")
+    # logger.info("Logging configured successfully")
+    # logger.info(f"Log level: {settings.log_level}")
+    # logger.info(f"Log file: {settings.log_file}")

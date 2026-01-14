@@ -143,15 +143,18 @@ class SocialSearchService:
                         
                         # Check for image fields
                         if 'cse_image' in pagemap:
-                            logger.info(f"✓ Has cse_image: {pagemap['cse_image']}")
+                            # logger.debug(f"Has cse_image: {pagemap['cse_image']}")
+                            pass
                         if 'cse_thumbnail' in pagemap:
-                            logger.info(f"✓ Has cse_thumbnail: {pagemap['cse_thumbnail']}")
+                            # logger.debug(f"Has cse_thumbnail: {pagemap['cse_thumbnail']}")
+                            pass
                         if 'metatags' in pagemap:
-                            logger.info(f"✓ Has metatags")
+                            # logger.debug(f"Has metatags")
                             if pagemap['metatags']:
                                 meta = pagemap['metatags'][0] if isinstance(pagemap['metatags'], list) else pagemap['metatags']
                                 if 'og:image' in meta:
-                                    logger.info(f"  ✓ og:image: {meta['og:image']}")
+                                    pass
+                                    # logger.debug(f"og:image: {meta['og:image']}")
                     
                     result = {
                         'title': item.get('title', ''),
