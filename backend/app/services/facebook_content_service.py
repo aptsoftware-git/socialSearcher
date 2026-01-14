@@ -1,5 +1,6 @@
 """
 Facebook Content Service - Fetch full post details using Facebook Graph API.
+Supports third-party scraping via ScrapeCreators API (configurable via FACEBOOK_SCRAPER env variable).
 """
 
 from typing import Optional, Dict, Any
@@ -15,6 +16,7 @@ from app.models import (
     SocialContentMedia,
     SocialContentEngagement
 )
+from app.services.scrapecreators_service import scrapecreators_service
 
 
 class FacebookContentService:
@@ -115,7 +117,7 @@ class FacebookContentService:
     
     async def get_post_content(self, url: str) -> Optional[SocialFullContent]:
         """
-        Fetch full post details from Facebook Graph API.
+        Fetch full post details from Facebook Graph API or ScrapeCreators API.
         
         Args:
             url: Facebook post URL
@@ -123,6 +125,19 @@ class FacebookContentService:
         Returns:
             SocialFullContent with post details or None if error
         """
+        # Check if we should use ScrapeCreators API instead
+        if settings.facebook_scraper.upper() == "SCRAPECREATORS":
+            logger.info("🔄 Using ScrapeCreators API for Facebook content")
+            scrapecreators_data = await scrapecreators_service.get_facebook_content(url)
+            if scrapecreators_data:
+                return self._convert_scrapecreators_to_model(scrapecreators_data)
+            else:
+                logger.warning("⚠️ ScrapeCreators failed, falling back to native Facebook API")
+                # Fall through to native API
+        
+        # Use native Facebook Graph API
+        logger.info("🔄 Using native Facebook Graph API")
+        
         if not self.access_token:
             logger.error("Facebook Access Token not configured")
             return None
@@ -310,4 +325,74 @@ class FacebookContentService:
             
         except Exception as e:
             logger.error(f"Error fetching Facebook post {original_post_id}: {e}", exc_info=True)
+            return None
+    
+    def _convert_scrapecreators_to_model(self, data: Dict[str, Any]) -> Optional[SocialFullContent]:
+        """
+        Convert ScrapeCreators formatted data to SocialFullContent model.
+        
+        Args:
+            data: Formatted data from ScrapeCreators service
+        
+        Returns:
+            SocialFullContent model instance
+        """
+        try:
+            # Extract author info
+            author_data = data.get("author", {})
+            author = SocialContentAuthor(
+                name=author_data.get("name", "Unknown"),
+                username=author_data.get("username", "unknown"),
+                profile_picture=author_data.get("profile_image", ""),
+                verified=bool(author_data.get("verified", False))
+            )
+            
+            # Extract media
+            media_list = []
+            for m in data.get("media", []):
+                media_type = m.get("type", "image")
+                media_list.append(
+                    SocialContentMedia(
+                        type=media_type,
+                        url=m.get("url", ""),
+                        thumbnail_url=m.get("thumbnail", ""),
+                        width=None,
+                        height=None,
+                        duration_ms=int(m.get("duration", 0) * 1000) if m.get("duration") else None
+                    )
+                )
+            
+            # Extract metrics
+            metrics = data.get("metrics", {})
+            engagement = SocialContentEngagement(
+                likes=int(metrics.get("likes") or 0),
+                comments=int(metrics.get("comments") or 0),
+                shares=int(metrics.get("shares") or 0),
+                views=int(metrics.get("views") or 0)
+            )
+            
+            # Create SocialFullContent
+            content = SocialFullContent(
+                platform="facebook",
+                platform_id=data.get("post_id", "unknown"),
+                url=data.get("url", ""),
+                content_type=data.get("content_type", "text"),
+                text=data.get("text", ""),
+                media=media_list,
+                author=author,
+                engagement=engagement,
+                posted_at=data.get("timestamp") or datetime.utcnow(),
+                platform_data={
+                    'scraper': 'scrapecreators',
+                    'post_id': data.get("post_id", ""),
+                    'audio': data.get("audio"),
+                    'raw_data': data.get("raw_data", {})
+                }
+            )
+            
+            logger.info("✅ Converted ScrapeCreators Facebook data to SocialFullContent model")
+            return content
+            
+        except Exception as e:
+            logger.error(f"❌ Error converting ScrapeCreators Facebook data to model: {e}")
             return None

@@ -228,6 +228,7 @@ export interface FetchContentRequest {
   url: string;
   platform?: string;
   force_refresh?: boolean;
+  llm_model?: string;
 }
 
 export interface FetchContentResponse {

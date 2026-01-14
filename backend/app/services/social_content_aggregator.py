@@ -42,7 +42,11 @@ class SocialContentAggregator:
     
     def _get_from_cache(self, cache_key: str) -> Optional[SocialFullContent]:
         """Retrieve content from cache if not expired."""
+        logger.info(f"🔍 _get_from_cache called with key: {cache_key}")
+        logger.info(f"📊 Total cache entries: {len(self._cache)}")
+        
         if cache_key not in self._cache:
+            logger.warning(f"❌ Cache key not in cache. Available keys: {list(self._cache.keys())[:3]}")
             return None
         
         cached_data = self._cache[cache_key]
@@ -51,10 +55,10 @@ class SocialContentAggregator:
         if expires_at and datetime.utcnow() > expires_at:
             # Cache expired, remove it
             del self._cache[cache_key]
-            logger.debug(f"Cache expired for key: {cache_key}")
+            logger.info(f"⏰ Cache expired for key: {cache_key}")
             return None
         
-        logger.debug(f"Cache hit for key: {cache_key}")
+        logger.info(f"✅ Cache hit for key: {cache_key}")
         content = SocialFullContent(**cached_data['content'])
         content.cached = True
         content.cache_expires_at = expires_at
@@ -70,13 +74,15 @@ class SocialContentAggregator:
             'cached_at': datetime.utcnow()
         }
         
-        logger.debug(f"Cached content for key: {cache_key}, expires: {expires_at}")
+        logger.info(f"💾 Saved content to cache - Key: {cache_key}, URL: {content.url[:60]}..., Platform: {content.platform}, Expires: {expires_at}")
     
     def get_cached_analysis(self, url: str, llm_model: Optional[str] = None) -> Optional[EventData]:
         """Retrieve cached AI analysis result."""
         cache_key = self._get_analysis_cache_key(url, llm_model)
+        logger.info(f"Looking for analysis with cache_key: {cache_key} (url: {url[:60]}..., model: {llm_model})")
         
         if cache_key not in self._analysis_cache:
+            logger.info(f"❌ Cache key not found. Available keys: {list(self._analysis_cache.keys())[:5]}...")
             return None
         
         cached_data = self._analysis_cache[cache_key]
@@ -88,7 +94,7 @@ class SocialContentAggregator:
             logger.debug(f"Analysis cache expired for key: {cache_key}")
             return None
         
-        logger.info(f"✅ Analysis cache hit for URL: {url}")
+        logger.info(f"✅ Analysis cache hit for URL: {url[:60]}...")
         return EventData(**cached_data['event'])
     
     def save_analysis_to_cache(self, url: str, event: EventData, llm_model: Optional[str] = None):
@@ -102,7 +108,43 @@ class SocialContentAggregator:
             'cached_at': datetime.utcnow()
         }
         
-        logger.info(f"💾 Cached AI analysis for URL: {url}, expires: {expires_at}")
+        logger.info(f"💾 Saved analysis to cache - Key: {cache_key}, URL: {url[:60]}..., Model: {llm_model}, Title: {event.title[:50] if event.title else 'N/A'}...")
+    
+    def check_cache_status(self, url: str, platform: str, llm_model: Optional[str] = None) -> Dict[str, bool]:
+        """
+        Check if content and AI analysis are cached for a URL.
+        
+        Args:
+            url: Social media URL
+            platform: Platform name
+            llm_model: LLM model used for analysis
+            
+        Returns:
+            Dict with 'content_cached' and 'analysis_cached' booleans
+        """
+        content_cache_key = self._get_cache_key(url, platform)
+        analysis_cache_key = self._get_analysis_cache_key(url, llm_model)
+        
+        # Check content cache
+        content_cached = False
+        if content_cache_key in self._cache:
+            cached_data = self._cache[content_cache_key]
+            expires_at = cached_data.get('expires_at')
+            if not expires_at or datetime.utcnow() <= expires_at:
+                content_cached = True
+        
+        # Check analysis cache
+        analysis_cached = False
+        if analysis_cache_key in self._analysis_cache:
+            cached_data = self._analysis_cache[analysis_cache_key]
+            expires_at = cached_data.get('expires_at')
+            if not expires_at or datetime.utcnow() <= expires_at:
+                analysis_cached = True
+        
+        return {
+            'content_cached': content_cached,
+            'analysis_cached': analysis_cached
+        }
     
     def detect_platform(self, url: str) -> Optional[str]:
         """
@@ -128,7 +170,8 @@ class SocialContentAggregator:
         self,
         url: str,
         platform: Optional[str] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
+        llm_model: Optional[str] = None
     ) -> Optional[SocialFullContent]:
         """
         Fetch full content from social media URL.
@@ -137,6 +180,7 @@ class SocialContentAggregator:
             url: Social media post/tweet/video URL
             platform: Platform name (auto-detected if None)
             force_refresh: Skip cache and fetch fresh content
+            llm_model: LLM model name to check for cached analysis
             
         Returns:
             SocialFullContent or None if error
@@ -149,15 +193,35 @@ class SocialContentAggregator:
                 return None
         
         platform = platform.lower()
-        logger.info(f"Fetching {platform} content from: {url}")
+        logger.info(f"🔍 Fetching {platform} content from: {url[:80]}...")
         
         # Check cache first (unless force refresh)
         if not force_refresh:
             cache_key = self._get_cache_key(url, platform)
+            logger.info(f"🔑 Looking for content with cache_key: {cache_key}")
             cached_content = self._get_from_cache(cache_key)
             if cached_content:
-                logger.info(f"Returning cached {platform} content")
+                logger.info(f"✅ CACHE HIT - Returning cached {platform} content for URL: {url[:60]}...")
+                logger.info(f"Looking for analysis with llm_model: {llm_model}")
+                
+                # Check if we have cached analysis and attach it to content
+                cached_analysis = self.get_cached_analysis(url, llm_model)
+                if cached_analysis:
+                    logger.info(f"✅ Attaching cached analysis to content: {cached_analysis.title[:50] if cached_analysis.title else 'N/A'}...")
+                    cached_content.extracted_event = cached_analysis
+                else:
+                    logger.warning(f"❌ No cached analysis found for URL with model: {llm_model}")
+                    # Try without model (for backward compatibility)
+                    cached_analysis_no_model = self.get_cached_analysis(url, None)
+                    if cached_analysis_no_model:
+                        logger.info(f"✅ Found analysis without model: {cached_analysis_no_model.title[:50] if cached_analysis_no_model.title else 'N/A'}...")
+                        cached_content.extracted_event = cached_analysis_no_model
+                
                 return cached_content
+            else:
+                logger.warning(f"❌ CACHE MISS - No cached content found. Available cache keys (first 5): {list(self._cache.keys())[:5]}")
+        else:
+            logger.info(f"⚠️ Force refresh enabled - skipping cache lookup")
         
         # Fetch from appropriate service
         content = None
@@ -192,7 +256,7 @@ class SocialContentAggregator:
             if content:
                 cache_key = self._get_cache_key(url, platform)
                 self._save_to_cache(cache_key, content)
-                logger.info(f"Successfully fetched and cached {platform} content")
+                logger.debug(f"Successfully fetched and cached {platform} content")
             else:
                 logger.warning(f"No content retrieved for {platform} URL: {url}")
             

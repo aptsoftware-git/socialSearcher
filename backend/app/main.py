@@ -35,7 +35,8 @@ from app.models import (
     FetchContentRequest,
     FetchContentResponse,
     AnalyseContentRequest,
-    AnalyseContentResponse
+    AnalyseContentResponse,
+    ExportSocialEventsRequest
 )
 
 # Setup logging
@@ -402,7 +403,8 @@ async def fetch_social_content(request: FetchContentRequest):
         content = await social_content_aggregator.fetch_content(
             url=request.url,
             platform=request.platform,
-            force_refresh=request.force_refresh
+            force_refresh=request.force_refresh,
+            llm_model=request.llm_model
         )
         
         if not content:
@@ -425,6 +427,59 @@ async def fetch_social_content(request: FetchContentRequest):
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch content: {str(e)}"
+        )
+
+
+# Cache Status Check Endpoint
+
+@app.post("/api/v1/social-content/cache-status")
+async def check_cache_status(request: dict):
+    """
+    Check cache status for multiple social media URLs.
+    
+    Returns which URLs have cached content and AI analysis.
+    
+    Args:
+        request: Dict with 'urls' list of {url, platform} objects and optional 'llm_model'
+    
+    Returns:
+        Dict mapping URLs to their cache status
+    
+    Example:
+        ```
+        POST /api/v1/social-content/cache-status
+        {
+            "urls": [
+                {"url": "https://twitter.com/...", "platform": "twitter"},
+                {"url": "https://youtube.com/...", "platform": "youtube"}
+            ],
+            "llm_model": "claude"
+        }
+        ```
+    """
+    try:
+        urls = request.get('urls', [])
+        llm_model = request.get('llm_model')
+        
+        results = {}
+        for item in urls:
+            url = item.get('url')
+            platform = item.get('platform')
+            
+            if url and platform:
+                status = social_content_aggregator.check_cache_status(url, platform, llm_model)
+                results[url] = status
+        
+        return {
+            'status': 'success',
+            'cache_status': results
+        }
+        
+    except Exception as e:
+        logger.error(f"Cache status check failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check cache status: {str(e)}"
         )
 
 
@@ -1143,6 +1198,97 @@ async def export_custom_events_to_excel(
         raise HTTPException(
             status_code=500,
             detail=f"Excel export failed: {str(e)}"
+        )
+
+
+@app.post("/api/v1/export/social-events")
+async def export_social_events(
+    request: ExportSocialEventsRequest
+):
+    """
+    Export social media search results to Excel, including cached content and analysis.
+    
+    This endpoint exports social search results with their cached content and AI analysis
+    if available. Supports platform-specific exports.
+    
+    Args:
+        request: ExportSocialEventsRequest with items and optional platform filter
+    
+    Returns:
+        Excel file download (streaming response)
+    
+    Example:
+        ```
+        POST /api/v1/export/social-events
+        {
+            "items": [
+                {
+                    "url": "https://youtube.com/watch?v=...",
+                    "platform": "youtube",
+                    "title": "Video Title",
+                    "snippet": "Description...",
+                    "display_link": "youtube.com",
+                    "cached_content": {...},
+                    "cached_analysis": {...}
+                }
+            ],
+            "platform_filter": "youtube",
+            "llm_model": "claude-3-5-haiku-20241022"
+        }
+        ```
+    """
+    try:
+        if not request.items:
+            raise HTTPException(
+                status_code=400,
+                detail="No items provided for export"
+            )
+        
+        logger.info(f"Exporting {len(request.items)} social media events (platform: {request.platform_filter})")
+        
+        # Convert Pydantic models to dicts for export
+        items_dict = [item.model_dump() for item in request.items]
+        
+        # Debug: Log first item to see structure
+        if items_dict:
+            first_item = items_dict[0]
+            logger.info(f"First item URL: {first_item.get('url', 'N/A')[:50]}...")
+            logger.info(f"First item - cached_content: {first_item.get('cached_content') is not None}")
+            logger.info(f"First item - cached_analysis: {first_item.get('cached_analysis') is not None}")
+            if first_item.get('cached_analysis'):
+                analysis = first_item['cached_analysis']
+                logger.info(f"Analysis title: {analysis.get('title', 'N/A')[:80]}...")
+                logger.info(f"Analysis event_type: {analysis.get('event_type', 'N/A')}")
+        
+        # Generate Excel file
+        excel_bytes = excel_exporter.export_social_events_to_excel(
+            items=items_dict,
+            platform_filter=request.platform_filter
+        )
+        
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        platform_name = request.platform_filter.lower() if request.platform_filter else "social"
+        filename = f"{platform_name}_events_{timestamp}.xlsx"
+        
+        logger.info(f"Generated social export file: {filename}")
+        
+        # Return as streaming response
+        return StreamingResponse(
+            excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Social events export failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Social events export failed: {str(e)}"
         )
 
 

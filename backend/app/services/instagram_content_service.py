@@ -1,6 +1,7 @@
 """
 Instagram Content Service - Fetch full post details using Instagram Graph API.
 NOTE: Requires Instagram Business Account connected to Facebook Page.
+Supports third-party scraping via ScrapeCreators API (configurable via INSTAGRAM_SCRAPER env variable).
 """
 
 from typing import Optional, Dict, Any
@@ -16,6 +17,7 @@ from app.models import (
     SocialContentMedia,
     SocialContentEngagement
 )
+from app.services.scrapecreators_service import scrapecreators_service
 
 
 class InstagramContentService:
@@ -50,9 +52,9 @@ class InstagramContentService:
     
     async def get_post_content(self, url: str) -> Optional[SocialFullContent]:
         """
-        Fetch full post details from Instagram Graph API.
+        Fetch full post details from Instagram Graph API or ScrapeCreators API.
         
-        NOTE: This requires:
+        NOTE: Native Instagram Graph API requires:
         1. Instagram Business Account
         2. Connected to Facebook Page
         3. Access token with instagram_basic permission
@@ -63,6 +65,19 @@ class InstagramContentService:
         Returns:
             SocialFullContent with post details or None if error
         """
+        # Check if we should use ScrapeCreators API instead
+        if settings.instagram_scraper.upper() == "SCRAPECREATORS":
+            logger.info("🔄 Using ScrapeCreators API for Instagram content")
+            scrapecreators_data = await scrapecreators_service.get_instagram_content(url)
+            if scrapecreators_data:
+                return self._convert_scrapecreators_to_model(scrapecreators_data)
+            else:
+                logger.warning("⚠️ ScrapeCreators failed, falling back to native Instagram API")
+                # Fall through to native API
+        
+        # Use native Instagram Graph API
+        logger.info("🔄 Using native Instagram Graph API")
+        
         if not self.access_token:
             logger.warning(
                 "Instagram Access Token not configured. Instagram Graph API requires: "
@@ -111,4 +126,86 @@ class InstagramContentService:
                 
         except Exception as e:
             logger.error(f"Error fetching Instagram post {shortcode}: {e}", exc_info=True)
+            return None
+    
+    def _convert_scrapecreators_to_model(self, data: Dict[str, Any]) -> Optional[SocialFullContent]:
+        """
+        Convert ScrapeCreators formatted data to SocialFullContent model.
+        
+        Args:
+            data: Formatted data from ScrapeCreators service
+        
+        Returns:
+            SocialFullContent model instance
+        """
+        try:
+            # Debug log to see data structure
+            logger.info(f"📊 ScrapeCreators Instagram data keys: {list(data.keys())}")
+            logger.info(f"🖼️ Instagram media count: {len(data.get('media', []))}")
+            
+            # Extract author info
+            author_data = data.get("author", {})
+            logger.info(f"👤 Instagram author_data: name={author_data.get('name')}, username={author_data.get('username')}, profile_image={'present ('+str(len(author_data.get('profile_image', '')))+' chars)' if author_data.get('profile_image') else 'EMPTY'}")
+            
+            author = SocialContentAuthor(
+                name=author_data.get("name", "Unknown"),
+                username=author_data.get("username", "unknown"),
+                profile_picture=author_data.get("profile_image", ""),
+                verified=author_data.get("verified", False),
+                additional_info={
+                    'followers': author_data.get("followers", 0)
+                }
+            )
+            
+            # Extract media
+            media_list = []
+            for m in data.get("media", []):
+                media_type = m.get("type", "image")
+                media_url = m.get("url", "")
+                logger.info(f"🖼️ Instagram media: type={media_type}, url={'present ('+str(len(media_url))+' chars)' if media_url else 'EMPTY'}")
+                
+                media_list.append(
+                    SocialContentMedia(
+                        type=media_type,
+                        url=media_url,
+                        thumbnail_url=m.get("thumbnail", ""),
+                        width=None,
+                        height=None,
+                        duration_ms=int(m.get("duration", 0) * 1000) if m.get("duration") else None
+                    )
+                )
+            
+            # Extract metrics
+            metrics = data.get("metrics", {})
+            engagement = SocialContentEngagement(
+                likes=metrics.get("likes", 0) or 0,
+                comments=metrics.get("comments", 0) or 0,
+                shares=0,  # Instagram doesn't have shares
+                views=metrics.get("views", 0) or 0
+            )
+            
+            # Create SocialFullContent
+            content = SocialFullContent(
+                platform="instagram",
+                platform_id=data.get("shortcode", "unknown"),
+                url=data.get("url", ""),
+                content_type=data.get("content_type", "image"),
+                text=data.get("text", ""),
+                media=media_list,
+                author=author,
+                engagement=engagement,
+                posted_at=data.get("timestamp") or datetime.utcnow(),
+                platform_data={
+                    'scraper': 'scrapecreators',
+                    'shortcode': data.get("shortcode", ""),
+                    'audio': data.get("audio"),
+                    'raw_data': data.get("raw_data", {})
+                }
+            )
+            
+            logger.info("✅ Converted ScrapeCreators Instagram data to SocialFullContent model")
+            return content
+            
+        except Exception as e:
+            logger.error(f"❌ Error converting ScrapeCreators Instagram data to model: {e}")
             return None

@@ -8,7 +8,8 @@ import {
   FetchContentRequest,
   FetchContentResponse,
   AnalyseContentRequest,
-  AnalyseContentResponse
+  AnalyseContentResponse,
+  SocialFullContent
 } from '../types/events';
 
 /**
@@ -52,8 +53,6 @@ class ApiService {
     if (query.date_to) {
       cleanedQuery.date_to = query.date_to;
     }
-
-    console.log('Sending search request:', cleanedQuery);
 
     const response = await this.client.post<SearchResponse>('/api/v1/search', cleanedQuery);
     return response.data;
@@ -140,6 +139,20 @@ class ApiService {
   }
 
   /**
+   * Check cache status for multiple URLs
+   */
+  async checkCacheStatus(urls: Array<{url: string, platform: string}>, llmModel?: string): Promise<{
+    status: string;
+    cache_status: Record<string, {content_cached: boolean, analysis_cached: boolean}>;
+  }> {
+    const response = await this.client.post('/api/v1/social-content/cache-status', {
+      urls,
+      llm_model: llmModel
+    });
+    return response.data;
+  }
+
+  /**
    * Get social content cache statistics
    */
   async getSocialContentCacheStats(): Promise<{
@@ -160,6 +173,34 @@ class ApiService {
       ? `/api/v1/social-content/cache/clear?platform=${platform}`
       : '/api/v1/social-content/cache/clear';
     const response = await this.client.post(url);
+    return response.data;
+  }
+
+  /**
+   * Export social media search results to Excel
+   */
+  async exportSocialEvents(
+    items: Array<{
+      url: string;
+      platform: string;
+      title: string;
+      snippet: string;
+      display_link: string;
+      cached_content?: SocialFullContent;
+      cached_analysis?: EventData;
+    }>,
+    platformFilter?: string,
+    llmModel?: string
+  ): Promise<Blob> {
+    const response = await this.client.post(
+      '/api/v1/export/social-events',
+      {
+        items,
+        platform_filter: platformFilter,
+        llm_model: llmModel
+      },
+      { responseType: 'blob' }
+    );
     return response.data;
   }
 }

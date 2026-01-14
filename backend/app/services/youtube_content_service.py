@@ -213,6 +213,32 @@ class YouTubeContentService:
                 content_details = video_data.get('contentDetails', {})
                 statistics = video_data.get('statistics', {})
                 
+                # Get channel thumbnail
+                channel_id = snippet.get('channelId', '')
+                channel_thumbnail = ''
+                if channel_id:
+                    try:
+                        channel_response = await client.get(
+                            f"{self.base_url}/channels",
+                            params={
+                                'key': self.api_key,
+                                'id': channel_id,
+                                'part': 'snippet'
+                            }
+                        )
+                        if channel_response.status_code == 200:
+                            channel_data = channel_response.json()
+                            if channel_data.get('items'):
+                                channel_snippet = channel_data['items'][0].get('snippet', {})
+                                thumbnails = channel_snippet.get('thumbnails', {})
+                                # Get best quality thumbnail
+                                for quality in ['high', 'medium', 'default']:
+                                    if quality in thumbnails:
+                                        channel_thumbnail = thumbnails[quality].get('url', '')
+                                        break
+                    except Exception as e:
+                        logger.warning(f"Could not fetch channel thumbnail: {e}")
+                
                 # Parse published date
                 published_at_str = snippet.get('publishedAt', '')
                 try:
@@ -229,6 +255,7 @@ class YouTubeContentService:
                     name=snippet.get('channelTitle', 'Unknown'),
                     username=snippet.get('channelId', ''),
                     profile_url=f"https://www.youtube.com/channel/{snippet.get('channelId', '')}",
+                    profile_picture=channel_thumbnail,
                     verified=False  # YouTube doesn't provide verified status in basic API
                 )
                 
