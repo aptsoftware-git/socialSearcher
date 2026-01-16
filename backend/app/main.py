@@ -343,7 +343,7 @@ async def social_search(request: SocialSearchRequest):
         ```
     """
     try:
-        # logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']}")
+        # logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']}")
         
         # Execute social search
         results = await social_search_service.search(
@@ -355,7 +355,7 @@ async def social_search(request: SocialSearchRequest):
         return SocialSearchResponse(
             status="success",
             query=request.query,
-            sites=request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'],
+            sites=request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com'],
             total_results=len(results),
             results=results
         )

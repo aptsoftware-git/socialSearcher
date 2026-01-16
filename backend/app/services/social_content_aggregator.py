@@ -14,6 +14,7 @@ from app.services.youtube_content_service import YouTubeContentService
 from app.services.twitter_content_service import TwitterContentService
 from app.services.facebook_content_service import FacebookContentService
 from app.services.instagram_content_service import InstagramContentService
+from app.services.google_content_service import GoogleContentService
 
 
 class SocialContentAggregator:
@@ -25,6 +26,7 @@ class SocialContentAggregator:
         self.twitter_service = TwitterContentService()
         self.facebook_service = FacebookContentService()
         self.instagram_service = InstagramContentService()
+        self.google_service = GoogleContentService()
         
         # In-memory cache (in production, use Redis)
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -248,6 +250,8 @@ class SocialContentAggregator:
                     )
             elif platform == 'instagram':
                 content = await self.instagram_service.get_post_content(url)
+            elif platform == 'google':
+                content = await self.google_service.get_content(url)
             else:
                 logger.error(f"Unsupported platform: {platform}")
                 return None

@@ -463,6 +463,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
 
         {/* Content Section */}
         <Box my={3}>
+          {/* Content Display - Same for all platforms */}
           {content.title && (
             <Typography variant="h5" gutterBottom fontWeight="bold">
               {content.title}
@@ -526,8 +527,13 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
           </Stack>
         </Box>
 
-        {/* Analyse Button or Loading Cache */}
-        {!extractedEvent && (
+        {/* Analyse Button or Loading Cache - Hide for iframe-based Google content */}
+        {!extractedEvent && 
+         !(content.platform === 'google' && 
+           content.platform_data && 
+           typeof content.platform_data === 'object' && 
+           'open_in_iframe' in content.platform_data && 
+           content.platform_data.open_in_iframe === true) && (
           <>
             <Divider />
             <Box my={3} textAlign="center">

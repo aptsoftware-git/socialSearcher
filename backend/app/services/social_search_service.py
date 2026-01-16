@@ -25,6 +25,10 @@ class SocialSearchService:
         if not self.search_engine_id:
             self.search_engine_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
             logger.warning("GOOGLE_CSE_SOCIAL_ID not configured, falling back to GOOGLE_CSE_ID. This may return non-social-media results.")
+        
+        # Use separate CSE ID for Google web search (a20f6e447e5e74735)
+        self.google_web_search_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
+        
         self.base_url = "https://www.googleapis.com/customsearch/v1"
         # Get configurable max results from settings
         self.max_results_per_site = settings.max_social_search_results if hasattr(settings, 'max_social_search_results') else 10
@@ -56,7 +60,7 @@ class SocialSearchService:
         
         # Default sites if not provided - includes all configured platforms
         if not sites:
-            sites = ['youtube.com', 'x.com', 'facebook.com', 'instagram.com']
+            sites = ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']
         
         all_results = []
         
@@ -64,26 +68,52 @@ class SocialSearchService:
             for site in sites:
                 logger.info(f"Searching {site} for: {query}")
                 
-                # Construct site-specific query
-                site_query = f"site:{site} {query}"
-                
-                try:
-                    results = await self._fetch_results(
-                        client=client,
-                        query=site_query,
-                        max_results=results_per_site
-                    )
+                # Special handling for google.com: use web search CSE (a20f6e447e5e74735) without site: prefix
+                if site == 'google.com':
+                    if not self.google_web_search_id:
+                        logger.warning("Google web search CSE ID not configured, skipping google.com search")
+                        continue
                     
-                    # Add site information to each result
-                    for result in results:
-                        result['source_site'] = site
+                    try:
+                        # Direct query without site: prefix for general web search
+                        results = await self._fetch_results(
+                            client=client,
+                            query=query,  # No site: prefix
+                            max_results=results_per_site,
+                            search_engine_id=self.google_web_search_id  # Use web search CSE
+                        )
+                        
+                        # Add site information to each result
+                        for result in results:
+                            result['source_site'] = 'google.com'
+                        
+                        all_results.extend(results)
+                        logger.info(f"Found {len(results)} results from google.com (web search)")
+                        
+                    except Exception as e:
+                        logger.error(f"Error searching google.com: {e}")
+                        continue
+                else:
+                    # For social media sites: use site: prefix with social media CSE
+                    site_query = f"site:{site} {query}"
                     
-                    all_results.extend(results)
-                    logger.info(f"Found {len(results)} results from {site}")
-                    
-                except Exception as e:
-                    logger.error(f"Error searching {site}: {e}")
-                    continue
+                    try:
+                        results = await self._fetch_results(
+                            client=client,
+                            query=site_query,
+                            max_results=results_per_site
+                        )
+                        
+                        # Add site information to each result
+                        for result in results:
+                            result['source_site'] = site
+                        
+                        all_results.extend(results)
+                        logger.info(f"Found {len(results)} results from {site}")
+                        
+                    except Exception as e:
+                        logger.error(f"Error searching {site}: {e}")
+                        continue
         
         logger.info(f"Total social search results: {len(all_results)}")
         return all_results
@@ -92,7 +122,8 @@ class SocialSearchService:
         self,
         client: httpx.AsyncClient,
         query: str,
-        max_results: int = 10
+        max_results: int = 10,
+        search_engine_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Fetch results from Google Custom Search API.
@@ -101,10 +132,13 @@ class SocialSearchService:
             client: httpx AsyncClient
             query: Search query
             max_results: Maximum number of results to fetch
+            search_engine_id: Optional custom search engine ID (defaults to self.search_engine_id)
             
         Returns:
             List of search results
         """
+        # Use provided search engine ID or default
+        cse_id = search_engine_id if search_engine_id else self.search_engine_id
         results = []
         start_index = 1
         
@@ -114,7 +148,7 @@ class SocialSearchService:
             try:
                 params = {
                     'key': self.api_key,
-                    'cx': self.search_engine_id,
+                    'cx': cse_id,  # Use the selected CSE ID
                     'q': query,
                     'start': start_index,
                     'num': min(10, max_results - len(results))  # Max 10 per request

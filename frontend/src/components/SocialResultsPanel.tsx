@@ -29,6 +29,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Psychology as PsychologyIcon,
   FileDownload as DownloadIcon,
+  Google as GoogleIcon,
 } from '@mui/icons-material';
 import { SocialSearchResult, SocialFullContent } from '../types/events';
 import { apiService } from '../services/api';
@@ -173,7 +174,8 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
         platform: r.source_site.includes('facebook') ? 'facebook' :
                  r.source_site.includes('twitter') || r.source_site.includes('x.com') ? 'twitter' :
                  r.source_site.includes('youtube') ? 'youtube' :
-                 r.source_site.includes('instagram') ? 'instagram' : 'web'
+                 r.source_site.includes('instagram') ? 'instagram' :
+                 r.source_site.includes('google') ? 'google' : 'web'
       }));
 
       // Get current LLM model to check analysis cache with correct model
@@ -212,17 +214,22 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   const instagramResults = results.filter(r => 
     r.source_site.includes('instagram') || r.display_link.includes('instagram')
   );
+  const googleResults = results.filter(r => 
+    r.source_site.includes('google') || r.display_link.includes('google')
+  );
   const otherResults = results.filter(r => 
     !r.source_site.includes('facebook') && 
     !r.source_site.includes('twitter') && 
     !r.source_site.includes('x.com') &&
     !r.source_site.includes('youtube') &&
     !r.source_site.includes('instagram') &&
+    !r.source_site.includes('google') &&
     !r.display_link.includes('facebook') && 
     !r.display_link.includes('twitter') &&
     !r.display_link.includes('x.com') &&
     !r.display_link.includes('youtube') &&
-    !r.display_link.includes('instagram')
+    !r.display_link.includes('instagram') &&
+    !r.display_link.includes('google')
   );
 
   const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -238,6 +245,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     if (urlLower.includes('twitter.com') || urlLower.includes('x.com') || siteLower.includes('twitter') || siteLower.includes('x.com')) return 'twitter';
     if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be') || siteLower.includes('youtube')) return 'youtube';
     if (urlLower.includes('instagram.com') || siteLower.includes('instagram')) return 'instagram';
+    if (urlLower.includes('google.com') || siteLower.includes('google')) return 'google';
     
     return 'other';
   };
@@ -246,6 +254,7 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   const handleViewDetails = async (result: SocialSearchResult) => {
     const platform = detectPlatform(result.link, result.source_site);
     
+    // For all platforms (including Google), fetch content from backend
     setLoadingContent(result.link);
     setContentError(null);
     setSnackbarOpen(false);
@@ -434,16 +443,19 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       return <YouTubeIcon sx={{ fontSize: 20 }} />;
     } else if (site.includes('instagram')) {
       return <InstagramIcon sx={{ fontSize: 20 }} />;
+    } else if (site.includes('google')) {
+      return <GoogleIcon sx={{ fontSize: 20 }} />;
     }
     return <WebIcon sx={{ fontSize: 20 }} />;
   };
 
   // Get color for site chip
-  const getSiteColor = (site: string): "primary" | "info" | "error" | "warning" | "default" => {
+  const getSiteColor = (site: string): "primary" | "info" | "error" | "warning" | "success" | "default" => {
     if (site.includes('facebook')) return 'primary';
     if (site.includes('twitter') || site.includes('x.com')) return 'info';
     if (site.includes('youtube')) return 'error';
     if (site.includes('instagram')) return 'warning';
+    if (site.includes('google')) return 'success';
     return 'default';
   };
 
@@ -820,11 +832,12 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
             Found <strong>{results.length}</strong> results for "<strong>{query}</strong>"
             {' '}({youtubeResults.length} YouTube, {twitterResults.length} Twitter/X, 
-            {facebookResults.length} Facebook, {instagramResults.length} Instagram
+            {facebookResults.length} Facebook, {instagramResults.length} Instagram,
+            {' '}{googleResults.length} Google
             {otherResults.length > 0 && `, ${otherResults.length} Other`})
           </Typography>
           <Alert severity="info" sx={{ mt: 2 }}>
-            These results are from social media platforms. Click on any link to view the original post.
+            These results are from social media platforms (YouTube, Twitter/X, Facebook, Instagram). Click on any link to view the original post.
           </Alert>
         </Box>
 
@@ -865,12 +878,19 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
               aria-controls="social-tabpanel-3"
               sx={{ fontWeight: 600 }}
             />
+            <Tab 
+              icon={<Badge badgeContent={googleResults.length} color="success"><GoogleIcon /></Badge>}
+              label="Google" 
+              id="social-tab-4"
+              aria-controls="social-tabpanel-4"
+              sx={{ fontWeight: 600 }}
+            />
             {otherResults.length > 0 && (
               <Tab 
                 icon={<Badge badgeContent={otherResults.length} color="default"><WebIcon /></Badge>}
                 label="Other" 
-                id="social-tab-4"
-                aria-controls="social-tabpanel-4"
+                id="social-tab-5"
+                aria-controls="social-tabpanel-5"
                 sx={{ fontWeight: 600 }}
               />
             )}
@@ -1073,9 +1093,58 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           )}
         </TabPanel>
 
+        {/* Google Tab */}
+        <TabPanel value={activeTab} index={4}>
+          {googleResults.length > 0 ? (
+            <>
+              {/* Export Controls */}
+              <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleSelectAll(googleResults)}
+                  disabled={exporting}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="text"
+                  size="small"
+                  onClick={() => handleDeselectAll(googleResults)}
+                  disabled={exporting || selectedItems.size === 0}
+                >
+                  Deselect All
+                </Button>
+                <Box sx={{ flexGrow: 1 }} />
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={exporting ? <CircularProgress size={16} color="inherit" /> : <DownloadIcon />}
+                  onClick={() => handleExport(googleResults, 'Google')}
+                  disabled={exporting}
+                >
+                  {exporting ? 'Exporting...' : 
+                   selectedItems.size > 0 ? `Export Selected (${selectedItems.size})` : 
+                   `Export All (${googleResults.length})`}
+                </Button>
+              </Box>
+              
+              <Stack spacing={2}>
+                {googleResults.map((result, index) => 
+                  renderResultCard(result, index, googleResults.length)
+                )}
+              </Stack>
+            </>
+          ) : (
+            <Alert severity="info">
+              No Google results found for this query.
+            </Alert>
+          )}
+        </TabPanel>
+
         {/* Other Tab (if any) */}
         {otherResults.length > 0 && (
-          <TabPanel value={activeTab} index={4}>
+          <TabPanel value={activeTab} index={5}>
             <Stack spacing={2}>
               {otherResults.map((result, index) => 
                 renderResultCard(result, index, otherResults.length)
