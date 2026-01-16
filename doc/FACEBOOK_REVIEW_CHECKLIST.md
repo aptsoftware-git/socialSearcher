@@ -1,6 +1,6 @@
 # Facebook App Review - Quick Checklist
 
-**App ID**: 2073969890024801  
+**App ID**: <your_app_id>  
 **Goal**: Get "Page Public Content Access" permission
 
 ---
@@ -9,7 +9,7 @@
 
 ### 1. App Basic Settings
 ```
-URL: https://developers.facebook.com/apps/2073969890024801/settings/basic/
+URL: https://developers.facebook.com/apps/<your_app_id>/settings/basic/
 ```
 
 - [ ] **Display Name**: Set professional name (e.g., "Event Scraper & Social Media Monitor")
@@ -48,7 +48,7 @@ Choose ONE method:
 
 ### 3. Navigate to App Review
 ```
-URL: https://developers.facebook.com/apps/2073969890024801/app-review/permissions/
+URL: https://developers.facebook.com/apps/<your_app_id>/app-review/permissions/
 ```
 
 Find: **"Page Public Content Access"** → Click **"Request Advanced Access"**

@@ -319,7 +319,7 @@ Search Results Card
 
 ### Test YouTube API:
 ```bash
-curl "https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&key=AIzaSyCTW_aDGUfmg_0fa-6h3pdKJ8CpHwNCMsw"
+curl "https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&key=<your key>"
 ```
 
 ### Test Twitter API:

@@ -26,7 +26,7 @@ class SocialSearchService:
             self.search_engine_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
             logger.warning("GOOGLE_CSE_SOCIAL_ID not configured, falling back to GOOGLE_CSE_ID. This may return non-social-media results.")
         
-        # Use separate CSE ID for Google web search (a20f6e447e5e74735)
+        # Use separate CSE ID for Google web search 
         self.google_web_search_id = settings.google_cse_id if hasattr(settings, 'google_cse_id') else None
         
         self.base_url = "https://www.googleapis.com/customsearch/v1"
@@ -68,7 +68,7 @@ class SocialSearchService:
             for site in sites:
                 logger.info(f"Searching {site} for: {query}")
                 
-                # Special handling for google.com: use web search CSE (a20f6e447e5e74735) without site: prefix
+                # Special handling for google.com: use web search CSE without site: prefix
                 if site == 'google.com':
                     if not self.google_web_search_id:
                         logger.warning("Google web search CSE ID not configured, skipping google.com search")

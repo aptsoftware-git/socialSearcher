@@ -2,7 +2,7 @@
 
 **Date**: January 10, 2026  
 **Goal**: Get "Page Public Content Access" permission for your app  
-**Your App ID**: 2073969890024801
+**Your App ID**: <your_app_id>
 
 ---
 
@@ -11,7 +11,7 @@
 Before starting the review, you need:
 
 - [x] Facebook Developer Account (you have this)
-- [x] Facebook App created (App ID: 2073969890024801)
+- [x] Facebook App created (App ID: )
 - [ ] Privacy Policy URL (we'll create this)
 - [ ] Terms of Service URL (optional but recommended)
 - [ ] App Icon (512x512 px minimum)
@@ -26,7 +26,7 @@ Before starting the review, you need:
 
 #### 1.1 Go to App Dashboard
 ```
-https://developers.facebook.com/apps/2073969890024801/settings/basic/
+https://developers.facebook.com/apps/<your_app_id>/settings/basic/
 ```
 
 #### 1.2 Fill in Basic Information
@@ -163,7 +163,7 @@ Create file: `privacy-policy.html` with this content:
     <p>
         Email: <strong>[your-email@domain.com]</strong><br>
         Application: Event Scraper & Social Media Monitor<br>
-        Facebook App ID: 2073969890024801
+        Facebook App ID: <strong>[your_app_id]</strong>
     </p>
     
     <h2>11. Legal Basis</h2>
@@ -282,7 +282,7 @@ App Dashboard → App Review → Permissions and Features
 
 Or direct URL:
 ```
-https://developers.facebook.com/apps/2073969890024801/app-review/permissions/
+https://developers.facebook.com/apps/<your_app_id>/app-review/permissions/
 ```
 
 #### 6.2 Find "Page Public Content Access"
