@@ -280,10 +280,12 @@ const SearchForm: React.FC<SearchFormProps> = ({
               // Only to date: "until January 2025"
               enhancedQuery = `${enhancedQuery} until ${formatDate(formData.date_to)}`;
             }
-          } else {
-            // No date specified - add "latest" or "recent" for more relevant results
+          } else if (formData.event_type || formData.location?.trim()) {
+            // Only add "latest" if user filled at least one optional field (event type or location)
+            // but didn't specify dates - this helps get more relevant results
             enhancedQuery = `${enhancedQuery} latest`;
           }
+          // If no optional fields are filled at all, use the phrase as-is without adding "latest"
           
           console.log(`Enhanced query: "${enhancedQuery}" (original: "${formData.phrase}")`);
           console.log(`Selected platforms: ${selectedPlatforms.join(', ')}`);
