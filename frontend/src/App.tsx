@@ -106,7 +106,7 @@ function App() {
               sx={{ height: 52, mr: 2 }}
             />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Event Scraper & Analyzer
+              <Box component="span" sx={{ fontWeight: 'bold' }}>deScrappeR</Box> - AI based customized web scrapper
             </Typography>
             <LLMConfigDropdown />
           </Toolbar>
