@@ -8,6 +8,7 @@ import SocialResultsPanel from './components/SocialResultsPanel';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import logoImage from './assets/logo.png';
+import makeInIndiaLogo from './assets/Make_In_India.png';
 import './App.css';
 
 const theme = createTheme({
@@ -160,9 +161,24 @@ function App() {
         {/* Footer */}
         <Box component="footer" sx={{ py: 2, px: 1.5, mt: 'auto', backgroundColor: (theme) => theme.palette.grey[200] }}>
           <Container maxWidth="xl">
-            <Typography variant="caption" color="text.secondary" align="center" display="block">
-              Developed by Apt Software Avenues Pvt. Ltd. (a Defender Framework tool)
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              {/* Make in India Logo - Absolute Left */}
+              <Box
+                component="img"
+                src={makeInIndiaLogo}
+                alt="Make in India"
+                sx={{ 
+                  height: 32,
+                  position: 'absolute',
+                  left: 0
+                }}
+              />
+              
+              {/* Developer Info - Centered */}
+              <Typography variant="caption" color="text.secondary" align="center">
+                Developed by Apt Software Avenues Pvt. Ltd. (a Defender Framework tool)
+              </Typography>
+            </Box>
           </Container>
         </Box>
       </Box>
