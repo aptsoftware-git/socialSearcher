@@ -1,7 +1,7 @@
 # Multi-stage build for React Frontend
 
 # Stage 1: Build the application
-FROM node:18-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,10 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
+
+# Manually install Rollup binary to fix optional dependency bug
+RUN npm install --save-optional @rollup/rollup-linux-x64-gnu
 
 # Copy source code
 COPY . .
