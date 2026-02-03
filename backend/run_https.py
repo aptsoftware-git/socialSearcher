@@ -12,7 +12,7 @@ if __name__ == "__main__":
     ssl_cert_path = os.getenv("SSL_CERT_PATH", "./ssl/cert.pem")
     ssl_key_path = os.getenv("SSL_KEY_PATH", "./ssl/key.pem")
     ssl_pfx_path = "./ssl/cert.pfx"
-    ssl_pfx_password = "password"
+    ssl_pfx_password = os.getenv("SSL_PFX_PASSWORD", "")  # Get from environment variable
     host = os.getenv("HOST", "0.0.0.0")
     port = int(os.getenv("PORT", "8000"))
     

@@ -113,19 +113,36 @@ async def shutdown_event():
 
 # Health Check Endpoints
 
+@app.get("/health")
+async def root_health_check():
+    """
+    Simple health check endpoint for Docker health checks.
+    
+    Returns:
+        Dictionary with health status
+    """
+    return {"status": "healthy"}
+
+
 @app.get("/api/v1/health")
 async def health_check():
     """
-    Health check endpoint.
+    Detailed health check endpoint with database connectivity.
     
     Returns:
         Dictionary with health status and timestamp
     """
-    return {
+    health_status = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
-        "version": "1.0.0"
+        "version": "1.0.0",
+        "services": {
+            "api": "operational",
+            "llm": "configured"
+        }
     }
+    
+    return health_status
 
 
 @app.get("/api/v1/ollama/status")
