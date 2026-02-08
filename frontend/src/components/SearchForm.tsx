@@ -16,6 +16,8 @@ import {
 } from '@mui/material';
 import { Search as SearchIcon, ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import { EventType, SearchQuery, ProgressUpdate, EventData, SocialSearchResult } from '../types/events';
+import { apiService } from '../services/api';
+import { streamService } from '../services/streamService';
 
 interface SearchFormProps {
   onSearchStart?: () => void;
@@ -223,8 +225,6 @@ const SearchForm: React.FC<SearchFormProps> = ({
       // If social search is enabled, ONLY call social search (for testing)
       if (formData.use_social_search) {
         try {
-          const { apiService } = await import('../services/api');
-          
           // Enhance search phrase with location, event type, and date context
           // Build a natural, search-engine friendly query
           let enhancedQuery = formData.phrase;
@@ -328,8 +328,6 @@ const SearchForm: React.FC<SearchFormProps> = ({
       }
 
       // Only run regular streaming search if social search is disabled
-      const { streamService } = await import('../services/streamService');
-      
       // Start streaming search (regular search)
       streamService.startStreaming(formData, {
         onProgress: (progress) => {

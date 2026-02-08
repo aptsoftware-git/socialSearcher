@@ -26,6 +26,20 @@ class ApiService {
       },
       timeout: Number(import.meta.env.VITE_API_TIMEOUT) || 600000, // 10 minutes for scraping + LLM processing
     });
+
+    // Add request interceptor to include auth token
+    this.client.interceptors.request.use(
+      (config) => {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
+      (error) => {
+        return Promise.reject(error);
+      }
+    );
   }
 
   /**

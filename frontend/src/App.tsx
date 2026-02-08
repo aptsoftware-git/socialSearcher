@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Container, CssBaseline, ThemeProvider, createTheme, AppBar, Toolbar, Typography, Box } from '@mui/material';
 import SearchForm from './components/SearchForm';
 import EventList from './components/EventList';
 import ProgressBar from './components/ProgressBar';
 import LLMConfigDropdown from './components/LLMConfigDropdown';
 import SocialResultsPanel from './components/SocialResultsPanel';
+import Login from './components/Login';
+import AdminDashboard from './components/AdminDashboard';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
-import logoImage from './assets/logo.png';
+import logoImage from './assets/defenderosint.webp';
 import makeInIndiaLogo from './assets/Make_In_India.png';
 import './App.css';
 
@@ -22,7 +24,24 @@ const theme = createTheme({
   },
 });
 
+interface User {
+  id: number;
+  email: string;
+  username: string;
+  full_name?: string;
+  is_active: boolean;
+  is_admin: boolean;
+  created_at: string;
+  last_login?: string;
+}
+
 function App() {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  // Search state
   const [events, setEvents] = useState<EventData[]>([]);
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -30,6 +49,39 @@ function App() {
   const [socialResults, setSocialResults] = useState<SocialSearchResult[]>([]);
   const [socialSearchQuery, setSocialSearchQuery] = useState<string>('');
   const [socialSearchSites, setSocialSearchSites] = useState<string[]>([]);
+
+  // Check authentication on mount
+  useEffect(() => {
+    const storedToken = localStorage.getItem('auth_token');
+    const storedUser = localStorage.getItem('user');
+
+    if (storedToken && storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setToken(storedToken);
+        setUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Failed to parse stored user:', error);
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  const handleLoginSuccess = (loggedInUser: User, authToken: string) => {
+    setUser(loggedInUser);
+    setToken(authToken);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+    setIsAuthenticated(false);
+  };
 
   const handleSearchStart = () => {
     // Reset state
@@ -93,6 +145,27 @@ function App() {
     }
   };
 
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Login onLoginSuccess={handleLoginSuccess} />
+      </ThemeProvider>
+    );
+  }
+
+  // Show admin dashboard for admin users
+  if (user?.is_admin) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <AdminDashboard token={token!} onLogout={handleLogout} />
+      </ThemeProvider>
+    );
+  }
+
+  // Show main search interface for regular users
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -107,9 +180,21 @@ function App() {
               sx={{ height: 52, mr: 2 }}
             />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              <Box component="span" sx={{ fontWeight: 'bold' }}>deScrappeR</Box> - AI based customized web scrapper
+              <Box component="span" sx={{ fontWeight: 'bold' }}>Tiger OSINT</Box> - AI based customized web scrapper
+            </Typography>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              {user?.email}
             </Typography>
             <LLMConfigDropdown />
+            <Box sx={{ ml: 2 }}>
+              <Typography 
+                variant="body2" 
+                sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={handleLogout}
+              >
+                Logout
+              </Typography>
+            </Box>
           </Toolbar>
         </AppBar>
 

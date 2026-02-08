@@ -40,7 +40,7 @@ interface LLMUsage {
 }
 
 interface LLMConfig {
-  provider: 'ollama' | 'claude';
+  provider: 'claude';  // Removed 'ollama' option
   model: string;
 }
 
@@ -60,13 +60,8 @@ const LLMConfigDropdown: React.FC = () => {
     return { provider: 'claude', model: 'claude-3-5-haiku-20241022' };
   });
 
-  const [models, setModels] = useState<{ ollama: LLMModel[]; claude: LLMModel[] }>({
-    ollama: [],
+  const [models, setModels] = useState<{ claude: LLMModel[] }>({
     claude: [],
-  });
-  const [defaultModels, setDefaultModels] = useState<{ ollama: string; claude: string }>({
-    ollama: 'qwen2.5:3b',
-    claude: 'claude-3-5-haiku-20241022',
   });
   const [usage, setUsage] = useState<LLMUsage | null>(null);
   const [loading, setLoading] = useState(false);
@@ -82,32 +77,22 @@ const LLMConfigDropdown: React.FC = () => {
       const data = await response.json();
 
       if (data.models) {
-        const ollamaModels = Array.isArray(data.models.ollama?.models) 
-          ? data.models.ollama.models 
-          : (data.models.ollama?.default ? [{ id: data.models.ollama.default, name: data.models.ollama.default }] : []);
-        
         const claudeModels = Array.isArray(data.models.claude?.models)
           ? data.models.claude.models
           : [];
 
         setModels({
-          ollama: ollamaModels,
           claude: claudeModels,
         });
 
-        const defaults = {
-          ollama: data.models.ollama?.default || 'qwen2.5:3b',
-          claude: data.models.claude?.default || 'claude-3.5-haiku',
-        };
-        setDefaultModels(defaults);
+        const defaultModel = data.models.claude?.default || 'claude-3-5-haiku-20241022';
 
         setConfig(prev => {
-          const currentModels = prev.provider === 'claude' ? claudeModels : ollamaModels;
-          const modelExists = currentModels.some((m: LLMModel) => m.id === prev.model);
+          const modelExists = claudeModels.some((m: LLMModel) => m.id === prev.model);
           if (!modelExists) {
             return {
               ...prev,
-              model: defaults[prev.provider],
+              model: defaultModel,
             };
           }
           return prev;
@@ -171,14 +156,6 @@ const LLMConfigDropdown: React.FC = () => {
     setError(null);
   };
 
-  const handleProviderChange = (event: SelectChangeEvent<'ollama' | 'claude'>) => {
-    const newProvider = event.target.value as 'ollama' | 'claude';
-    setConfig(() => ({
-      provider: newProvider,
-      model: defaultModels[newProvider],
-    }));
-  };
-
   const handleModelChange = (event: SelectChangeEvent<string>) => {
     setConfig((prev) => ({
       ...prev,
@@ -221,9 +198,9 @@ const LLMConfigDropdown: React.FC = () => {
               LLM Configuration
             </Typography>
             <Chip
-              label={config.provider === 'claude' ? 'Cloude' : 'Local'}
+              label="Claude"
               size="small"
-              color={config.provider === 'claude' ? 'primary' : 'default'}
+              color="primary"
             />
           </Box>
 
@@ -233,20 +210,7 @@ const LLMConfigDropdown: React.FC = () => {
             </Alert>
           )}
 
-          {/* Provider Selection */}
-          <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-            <InputLabel>Provider</InputLabel>
-            <Select
-              value={config.provider}
-              label="Provider"
-              onChange={handleProviderChange}
-            >
-              <MenuItem value="ollama">Local (Ollama)</MenuItem>
-              <MenuItem value="claude">Cloude (Claude API)</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* Model Selection */}
+          {/* Model Selection - Removed Provider Selection */}
           <FormControl fullWidth size="small">
             <InputLabel>Model</InputLabel>
             <Select
@@ -254,47 +218,38 @@ const LLMConfigDropdown: React.FC = () => {
               label="Model"
               onChange={handleModelChange}
             >
-              {config.provider === 'claude'
-                ? (models.claude.length > 0 
-                    ? models.claude.map((model) => (
-                        <MenuItem key={model.id} value={model.id}>
-                          {model.name}
-                        </MenuItem>
-                      ))
-                    : [
-                        <MenuItem key="claude-3-5-haiku-20241022" value="claude-3-5-haiku-20241022">
-                          Claude 3.5 Haiku (Fastest)
-                        </MenuItem>,
-                        <MenuItem key="claude-3-haiku-20240307" value="claude-3-haiku-20240307">
-                          Claude 3 Haiku
-                        </MenuItem>,
-                        <MenuItem key="claude-3-5-sonnet-20241022" value="claude-3-5-sonnet-20241022">
-                          Claude 3.5 Sonnet (Latest)
-                        </MenuItem>,
-                        <MenuItem key="claude-3-5-sonnet-20240620" value="claude-3-5-sonnet-20240620">
-                          Claude 3.5 Sonnet
-                        </MenuItem>,
-                        <MenuItem key="claude-3-opus-20240229" value="claude-3-opus-20240229">
-                          Claude 3 Opus (Best Quality)
-                        </MenuItem>,
-                        <MenuItem key="claude-3-sonnet-20240229" value="claude-3-sonnet-20240229">
-                          Claude 3 Sonnet
-                        </MenuItem>
-                      ]
-                  )
-                : (models.ollama.length > 0
-                    ? models.ollama.map((model) => (
-                        <MenuItem key={model.id} value={model.id}>
-                          {model.name || model.id}
-                        </MenuItem>
-                      ))
-                    : <MenuItem value="qwen2.5:3b">Qwen 2.5 3B</MenuItem>
-                  )}
+              {models.claude.length > 0 
+                ? models.claude.map((model) => (
+                    <MenuItem key={model.id} value={model.id}>
+                      {model.name}
+                    </MenuItem>
+                  ))
+                : [
+                    <MenuItem key="claude-3-5-haiku-20241022" value="claude-3-5-haiku-20241022">
+                      Claude 3.5 Haiku (Fastest)
+                    </MenuItem>,
+                    <MenuItem key="claude-3-haiku-20240307" value="claude-3-haiku-20240307">
+                      Claude 3 Haiku
+                    </MenuItem>,
+                    <MenuItem key="claude-3-5-sonnet-20241022" value="claude-3-5-sonnet-20241022">
+                      Claude 3.5 Sonnet (Latest)
+                    </MenuItem>,
+                    <MenuItem key="claude-3-5-sonnet-20240620" value="claude-3-5-sonnet-20240620">
+                      Claude 3.5 Sonnet
+                    </MenuItem>,
+                    <MenuItem key="claude-3-opus-20240229" value="claude-3-opus-20240229">
+                      Claude 3 Opus (Best Quality)
+                    </MenuItem>,
+                    <MenuItem key="claude-3-sonnet-20240229" value="claude-3-sonnet-20240229">
+                      Claude 3 Sonnet
+                    </MenuItem>
+                  ]
+              }
             </Select>
           </FormControl>
 
           {/* Model Pricing Info */}
-          {config.provider === 'claude' && models.claude.length > 0 && (
+          {models.claude.length > 0 && (
             <>
               <Divider sx={{ my: 1.5 }} />
               <Box>
@@ -327,7 +282,7 @@ const LLMConfigDropdown: React.FC = () => {
           )}
 
           {/* Usage Stats for Claude */}
-          {config.provider === 'claude' && usage && (
+          {usage && (
             <>
               <Divider sx={{ my: 1.5 }} />
               <Box>
@@ -407,7 +362,7 @@ const LLMConfigDropdown: React.FC = () => {
           <Divider sx={{ my: 1.5 }} />
 
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center' }}>
-            Current: {config.provider === 'claude' ? 'Claude API' : 'Ollama'} • {config.model}
+            Current: Claude API • {config.model}
           </Typography>
         </Box>
       </Menu>

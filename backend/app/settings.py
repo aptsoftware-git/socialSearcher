@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     
+    # Database
+    database_host: str = "postgres"
+    database_port: int = 5432
+    database_name: str = "socialsearcher"
+    database_user: str = "dbuser"
+    database_password: str = "YourStrongPassword123!"
+    
     # Ollama
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:3b"  # Qwen 2.5 3B - Good balance of speed and quality

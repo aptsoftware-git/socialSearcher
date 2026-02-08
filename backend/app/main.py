@@ -2,7 +2,7 @@
 Main FastAPI application entry point.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from datetime import datetime, timedelta
@@ -22,6 +22,9 @@ from app.services.search_service import search_service
 from app.services.excel_exporter import excel_exporter
 from app.services.social_search_service import social_search_service
 from app.services.social_content_aggregator import social_content_aggregator
+from app.services.database_service import db_service
+from app.routers.auth_router import router as auth_router, user_router
+from app.auth import get_current_active_user, TokenData
 from app.models import (
     SourcesListResponse,
     ArticleContent,
@@ -48,6 +51,10 @@ app = FastAPI(
     version="1.0.0",
     description="Web scraping tool for event extraction and summarization"
 )
+
+# Include routers
+app.include_router(auth_router)
+app.include_router(user_router)
 
 # CORS Configuration
 cors_origins = [origin.strip() for origin in settings.cors_origins.split(',')] if settings.cors_origins else ["http://localhost:5173"]
@@ -336,7 +343,10 @@ async def get_sources(enabled_only: bool = True):
 # Social Search Endpoint
 
 @app.post("/api/v1/social-search", response_model=SocialSearchResponse)
-async def social_search(request: SocialSearchRequest):
+async def social_search(
+    request: SocialSearchRequest,
+    current_user: TokenData = Depends(get_current_active_user)
+):
     """
     Search social media platforms using Google Custom Search Engine.
     
@@ -345,6 +355,7 @@ async def social_search(request: SocialSearchRequest):
     
     Args:
         request: SocialSearchRequest with query, sites, and results_per_site
+        current_user: Authenticated user
     
     Returns:
         SocialSearchResponse with search results
@@ -360,7 +371,27 @@ async def social_search(request: SocialSearchRequest):
         ```
     """
     try:
-        # logger.info(f"Social search request: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']}")
+        logger.info(f"Social search by user {current_user.email}: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']}")
+        
+        # Determine which platforms are being searched
+        sites = request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']
+        
+        # Track social search API call - Log separate usage for each platform
+        for site in sites:
+            # Normalize platform name
+            platform = site.replace('.com', '').replace('x', 'twitter')
+            
+            db_service.log_api_usage(
+                user_id=current_user.user_id,
+                api_provider='google_cse',
+                api_type='search',
+                platform=platform,
+                endpoint='/api/v1/social-search',
+                api_calls=1,  # 1 API call per platform
+                cost_usd=0.005  # $0.005 per platform search
+            )
+        
+        logger.info(f"Logged usage for {len(sites)} platforms: {sites}")
         
         # Execute social search
         results = await social_search_service.search(
@@ -388,7 +419,10 @@ async def social_search(request: SocialSearchRequest):
 # Social Content Fetch Endpoint
 
 @app.post("/api/v1/social-content/fetch", response_model=FetchContentResponse)
-async def fetch_social_content(request: FetchContentRequest):
+async def fetch_social_content(
+    request: FetchContentRequest,
+    current_user: TokenData = Depends(get_current_active_user)
+):
     """
     Fetch full content from a social media post/tweet/video URL.
     
@@ -399,6 +433,7 @@ async def fetch_social_content(request: FetchContentRequest):
     
     Args:
         request: FetchContentRequest with URL, platform, and force_refresh flag
+        current_user: Authenticated user
     
     Returns:
         FetchContentResponse with full social content
@@ -414,7 +449,7 @@ async def fetch_social_content(request: FetchContentRequest):
         ```
     """
     try:
-        # logger.info(f"Fetch content request: {request.platform} - {request.url}")
+        logger.info(f"Fetch content by user {current_user.email}: {request.platform} - {request.url}")
         
         # Fetch content using aggregator (with caching)
         content = await social_content_aggregator.fetch_content(
@@ -431,10 +466,49 @@ async def fetch_social_content(request: FetchContentRequest):
                 from_cache=False
             )
         
+        # Check if content was from cache
+        from_cache = content.cached if hasattr(content, 'cached') else False
+        
+        # Only track API usage if NOT from cache (actual API call was made)
+        if not from_cache:
+            # Determine API provider and cost based on platform
+            # Twitter, Facebook, Instagram use api.scrapecreators.com
+            # YouTube uses Google CSE API (free for us since we use search results)
+            # Google search scraping is free (no 3rd party API)
+            
+            if request.platform.lower() in ['twitter', 'facebook', 'instagram']:
+                api_provider = 'scrapecreators'
+                cost_per_scrape = 0.001  # $0.001 per scrape from scrapecreators
+                credits_used = 1
+            elif request.platform.lower() == 'youtube':
+                api_provider = 'google_cse'
+                cost_per_scrape = 0.0005  # $0.0005 per YouTube API call
+                credits_used = 1
+            else:
+                # Google search scraping or other free sources
+                api_provider = 'internal'
+                cost_per_scrape = 0.0  # Free
+                credits_used = 0
+            
+            # Track actual API usage (not cached)
+            db_service.log_api_usage(
+                user_id=current_user.user_id,
+                api_provider=api_provider,
+                api_type='scraping',
+                platform=request.platform,
+                endpoint='/api/v1/social-content/fetch',
+                api_calls=1,
+                credits_used=credits_used,
+                cost_usd=cost_per_scrape
+            )
+            logger.info(f"💰 Tracked scraping cost: ${cost_per_scrape} ({api_provider}) - NOT from cache")
+        else:
+            logger.info(f"✅ Content from cache - No API cost tracked")
+        
         return FetchContentResponse(
             status="success",
             content=content,
-            from_cache=content.cached if hasattr(content, 'cached') else False,
+            from_cache=from_cache,
             rate_limit_remaining=None,  # TODO: Track rate limits
             rate_limit_reset=None
         )
@@ -503,7 +577,10 @@ async def check_cache_status(request: dict):
 # Social Content Analysis Endpoint
 
 @app.post("/api/v1/social-content/analyse", response_model=AnalyseContentResponse)
-async def analyse_social_content(request: AnalyseContentRequest):
+async def analyse_social_content(
+    request: AnalyseContentRequest,
+    current_user: TokenData = Depends(get_current_active_user)
+):
     """
     Analyse social media content and extract event information using LLM.
     
@@ -512,6 +589,7 @@ async def analyse_social_content(request: AnalyseContentRequest):
     
     Args:
         request: AnalyseContentRequest with content and optional LLM model
+        current_user: Authenticated user
     
     Returns:
         AnalyseContentResponse with extracted event data
@@ -527,7 +605,7 @@ async def analyse_social_content(request: AnalyseContentRequest):
     """
     try:
         start_time = datetime.utcnow()
-        # logger.info(f"Analysing {request.content.platform} content: {request.content.url}")
+        logger.info(f"Analysing {request.content.platform} content by user {current_user.email}: {request.content.url}")
         
         # Check cache first for existing analysis
         cached_event = social_content_aggregator.get_cached_analysis(
@@ -536,8 +614,8 @@ async def analyse_social_content(request: AnalyseContentRequest):
         )
         
         if cached_event:
-            # Return cached analysis
-            # logger.info(f"✅ Returning cached analysis for: {request.content.url}")
+            # Return cached analysis - NO API COST and NO COUNT
+            logger.info(f"✅ Returning cached analysis for: {request.content.url} - No API cost, not tracked")
             return AnalyseContentResponse(
                 status="success",
                 event=cached_event,
@@ -621,6 +699,25 @@ async def analyse_social_content(request: AnalyseContentRequest):
             event,
             request.llm_model
         )
+        
+        # Track analysis API call - ONLY when actual LLM API was called (not cached)
+        # Determine provider and get token/cost info from metadata
+        analysis_provider = metadata.get("provider", "unknown")
+        tokens_used = metadata.get("tokens_used", 0)
+        cost_usd = metadata.get("cost", 0.0)
+        
+        db_service.log_api_usage(
+            user_id=current_user.user_id,
+            api_provider=analysis_provider,
+            api_type='analysis',
+            platform=request.content.platform,
+            endpoint='/api/v1/social-content/analyse',
+            api_calls=1,
+            tokens_used=tokens_used,
+            cost_usd=cost_usd
+        )
+        
+        logger.info(f"💰 Tracked analysis cost: ${cost_usd} ({analysis_provider}, {tokens_used} tokens) - NOT from cache")
         
         return AnalyseContentResponse(
             status="success",
@@ -817,7 +914,8 @@ async def proxy_image_options():
 async def search_events(
     query: SearchQuery,
     max_articles: int = 50,
-    min_relevance_score: float = 0.1
+    min_relevance_score: float = 0.1,
+    current_user: TokenData = Depends(get_current_active_user)
 ):
     """
     Execute end-to-end event search.
@@ -832,6 +930,7 @@ async def search_events(
         query: SearchQuery with phrase, filters, and date range
         max_articles: Maximum articles to scrape per source (default: 50)
         min_relevance_score: Minimum relevance score (0.0-1.0) to include results (default: 0.1)
+        current_user: Authenticated user
     
     Returns:
         SearchResponse with matched events, session ID, and metadata
@@ -849,7 +948,18 @@ async def search_events(
         ```
     """
     try:
-        logger.info(f"Search request: '{query.phrase}' (max_articles={max_articles}, min_score={min_relevance_score})")
+        logger.info(f"Search request by user {current_user.email}: '{query.phrase}' (max_articles={max_articles}, min_score={min_relevance_score})")
+        
+        # Track search API call
+        db_service.log_api_usage(
+            user_id=current_user.user_id,
+            api_provider='internal',
+            api_type='search',
+            platform='google',
+            endpoint='/api/v1/search',
+            api_calls=1,
+            cost_usd=0.0
+        )
         
         # Execute search pipeline
         response = await search_service.search(
@@ -878,7 +988,8 @@ async def search_events_stream(
     max_articles: int = 50,
     min_relevance_score: float = 0.1,
     llm_provider: str = None,
-    llm_model: str = None
+    llm_model: str = None,
+    token: str = None  # Auth token as query parameter (EventSource doesn't support headers)
 ):
     """
     Execute search with real-time Server-Sent Events (SSE) streaming.
@@ -901,6 +1012,7 @@ async def search_events_stream(
         date_to: End date filter YYYY-MM-DD (optional)
         max_articles: Maximum articles to scrape per source
         min_relevance_score: Minimum relevance score (0.0-1.0)
+        token: Authentication token (required for authenticated users)
     
     Returns:
         StreamingResponse with Server-Sent Events
@@ -919,6 +1031,20 @@ async def search_events_stream(
         ```
     """
     try:
+        # Authenticate user via token query parameter
+        current_user = None
+        if token:
+            try:
+                from app.auth import verify_token
+                current_user = verify_token(token)
+                logger.info(f"Streaming search by authenticated user {current_user.email}")
+            except Exception as auth_error:
+                logger.warning(f"Authentication failed for streaming endpoint: {auth_error}")
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+        else:
+            logger.warning("No token provided for streaming search")
+            raise HTTPException(status_code=401, detail="Authentication required")
+        
         # Build SearchQuery from query parameters
         # No default date range - let search engines and "recent" keyword handle recency
         query = SearchQuery(
@@ -934,6 +1060,17 @@ async def search_events_stream(
             query=query,
             results=[],
             status=SearchStatus.PENDING
+        )
+        
+        # Track streaming search API call
+        db_service.log_api_usage(
+            user_id=current_user.user_id,
+            api_provider='internal',
+            api_type='search_stream',
+            platform='google',
+            endpoint='/api/v1/search/stream',
+            api_calls=1,
+            cost_usd=0.0
         )
         
         logger.info(f"Starting streaming search: session={session_id}, query='{query.phrase}'")

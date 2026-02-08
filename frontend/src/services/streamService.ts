@@ -38,6 +38,12 @@ export class StreamService {
     // Add LLM configuration
     params.append('llm_provider', llmConfig.provider);
     params.append('llm_model', llmConfig.model);
+    
+    // Add auth token for authentication
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      params.append('token', token);
+    }
 
     const url = `${this.baseURL}/api/v1/search/stream?${params.toString()}`;
 

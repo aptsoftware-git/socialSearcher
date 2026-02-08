@@ -18,14 +18,20 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS user_api_usage (
     id SERIAL PRIMARY KEY,
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    api_provider VARCHAR(50) NOT NULL, -- 'claude', 'ollama', etc.
+    api_provider VARCHAR(50) NOT NULL, -- 'google_cse', 'scrapecreators', 'claude', etc.
+    api_type VARCHAR(50) NOT NULL, -- 'search', 'scraping', 'analysis'
+    platform VARCHAR(50), -- 'youtube', 'twitter', 'facebook', 'instagram', 'google', 'web'
     endpoint VARCHAR(100), -- 'search', 'extract', 'analyze', etc.
-    tokens_used INTEGER DEFAULT 0,
-    cost_usd DECIMAL(10, 4) DEFAULT 0.00,
+    api_calls INTEGER DEFAULT 1, -- Number of API calls made
+    credits_used INTEGER DEFAULT 0, -- For ScrapeCreators
+    tokens_used INTEGER DEFAULT 0, -- For Claude AI
+    cached_tokens INTEGER DEFAULT 0, -- For Claude AI with caching
+    cost_usd DECIMAL(10, 6) DEFAULT 0.00,
     request_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     response_time_ms INTEGER,
     success BOOLEAN DEFAULT true,
-    error_message TEXT
+    error_message TEXT,
+    metadata JSONB -- Additional data like query, result count, etc.
 );
 
 -- Create API keys table
@@ -50,19 +56,52 @@ CREATE TABLE IF NOT EXISTS search_history (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create cost summary view
-CREATE OR REPLACE VIEW user_cost_summary AS
+-- Create daily cost summary view
+CREATE OR REPLACE VIEW user_daily_cost_summary AS
 SELECT 
     u.id as user_id,
     u.username,
     u.email,
-    COUNT(ua.id) as total_requests,
-    SUM(ua.tokens_used) as total_tokens,
-    SUM(ua.cost_usd) as total_cost_usd,
-    MAX(ua.request_timestamp) as last_request
+    DATE(ua.request_timestamp) as usage_date,
+    COUNT(DISTINCT CASE WHEN ua.api_type = 'search' THEN ua.id END) as total_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'youtube' THEN 1 END) as youtube_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'twitter' THEN 1 END) as twitter_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'facebook' THEN 1 END) as facebook_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'instagram' THEN 1 END) as instagram_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'google' THEN 1 END) as google_searches,
+    COUNT(CASE WHEN ua.api_type = 'scraping' THEN 1 END) as total_scrapings,
+    COUNT(CASE WHEN ua.api_type = 'analysis' THEN 1 END) as total_analyses,
+    SUM(CASE WHEN ua.api_provider = 'google_cse' THEN ua.api_calls ELSE 0 END) as google_api_calls,
+    SUM(CASE WHEN ua.api_provider = 'scrapecreators' THEN ua.credits_used ELSE 0 END) as scrapecreators_credits,
+    SUM(CASE WHEN ua.api_provider = 'claude' THEN ua.tokens_used ELSE 0 END) as claude_tokens,
+    SUM(ua.cost_usd) as daily_cost_usd
 FROM users u
 LEFT JOIN user_api_usage ua ON u.id = ua.user_id
-GROUP BY u.id, u.username, u.email;
+GROUP BY u.id, u.username, u.email, DATE(ua.request_timestamp);
+
+-- Create monthly cost summary view
+CREATE OR REPLACE VIEW user_monthly_cost_summary AS
+SELECT 
+    u.id as user_id,
+    u.username,
+    u.email,
+    EXTRACT(YEAR FROM ua.request_timestamp) as year,
+    EXTRACT(MONTH FROM ua.request_timestamp) as month,
+    COUNT(DISTINCT CASE WHEN ua.api_type = 'search' THEN ua.id END) as total_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'youtube' THEN 1 END) as youtube_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'twitter' THEN 1 END) as twitter_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'facebook' THEN 1 END) as facebook_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'instagram' THEN 1 END) as instagram_searches,
+    COUNT(CASE WHEN ua.api_type = 'search' AND ua.platform = 'google' THEN 1 END) as google_searches,
+    COUNT(CASE WHEN ua.api_type = 'scraping' THEN 1 END) as total_scrapings,
+    COUNT(CASE WHEN ua.api_type = 'analysis' THEN 1 END) as total_analyses,
+    SUM(CASE WHEN ua.api_provider = 'google_cse' THEN ua.api_calls ELSE 0 END) as google_api_calls,
+    SUM(CASE WHEN ua.api_provider = 'scrapecreators' THEN ua.credits_used ELSE 0 END) as scrapecreators_credits,
+    SUM(CASE WHEN ua.api_provider = 'claude' THEN ua.tokens_used ELSE 0 END) as claude_tokens,
+    SUM(ua.cost_usd) as monthly_cost_usd
+FROM users u
+LEFT JOIN user_api_usage ua ON u.id = ua.user_id
+GROUP BY u.id, u.username, u.email, EXTRACT(YEAR FROM ua.request_timestamp), EXTRACT(MONTH FROM ua.request_timestamp);
 
 -- Create indexes for performance
 CREATE INDEX idx_users_email ON users(email);

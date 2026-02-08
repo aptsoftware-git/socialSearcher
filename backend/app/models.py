@@ -479,3 +479,108 @@ class ExportSocialEventsRequest(BaseModel):
     items: List[SocialEventExportItem]
     platform_filter: Optional[str] = Field(None, description="Platform name for filename (e.g., 'youtube', 'twitter')")
     llm_model: Optional[str] = Field(None, description="LLM model used for analysis")
+
+
+# ==================== AUTHENTICATION MODELS ====================
+
+class UserResponse(BaseModel):
+    """User response model (without password)."""
+    id: int
+    email: str
+    username: str
+    full_name: Optional[str] = None
+    is_active: bool
+    is_admin: bool
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+
+class LoginRequest(BaseModel):
+    """Login request model."""
+    email: str
+    password: str
+    remember_me: bool = False
+
+
+class LoginResponse(BaseModel):
+    """Login response model."""
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class CreateUserRequest(BaseModel):
+    """Create user request model (for admin)."""
+    email: str
+    username: str
+    password: str
+    full_name: Optional[str] = None
+    is_admin: bool = False
+
+
+class UpdateUserRequest(BaseModel):
+    """Update user request model."""
+    email: Optional[str] = None
+    username: Optional[str] = None
+    full_name: Optional[str] = None
+    is_active: Optional[bool] = None
+    password: Optional[str] = None  # Optional password for admin reset
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change password request model."""
+    old_password: str
+    new_password: str
+
+
+class UsageDailyBreakdown(BaseModel):
+    """Daily usage breakdown."""
+    usage_date: date
+    total_searches: int = 0
+    youtube_searches: int = 0
+    twitter_searches: int = 0
+    facebook_searches: int = 0
+    instagram_searches: int = 0
+    google_searches: int = 0
+    total_scrapings: int = 0
+    paid_scrapings: int = 0
+    free_scrapings: int = 0
+    total_analyses: int = 0
+    google_api_calls: int = 0
+    scrapecreators_credits: int = 0
+    claude_tokens: int = 0
+    daily_cost_usd: float = 0.0
+
+
+class UsageMonthlySummary(BaseModel):
+    """Monthly usage summary."""
+    year: int
+    month: int
+    total_searches: int = 0
+    youtube_searches: int = 0
+    twitter_searches: int = 0
+    facebook_searches: int = 0
+    instagram_searches: int = 0
+    google_searches: int = 0
+    total_scrapings: int = 0
+    paid_scrapings: int = 0
+    free_scrapings: int = 0
+    total_analyses: int = 0
+    google_api_calls: int = 0
+    scrapecreators_credits: int = 0
+    claude_tokens: int = 0
+    monthly_cost_usd: float = 0.0
+    daily_breakdown: List[UsageDailyBreakdown] = []
+
+
+class UserUsageReportRequest(BaseModel):
+    """Request for user usage report."""
+    user_id: int
+    year: int
+    month: int
+
+
+class UserUsageReportResponse(BaseModel):
+    """Response for user usage report."""
+    user: UserResponse
+    usage: UsageMonthlySummary

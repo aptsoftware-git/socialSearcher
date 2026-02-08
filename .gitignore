@@ -22,6 +22,8 @@ frontend/.env
 
 # Backend SSL
 backend/ssl/
+# nginx SSL
+nginx/ssl/
 # IDE
 .vscode/
 .idea/

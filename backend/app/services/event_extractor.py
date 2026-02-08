@@ -464,10 +464,10 @@ Return ONLY valid JSON matching the schema provided."""
                 return None, metadata
             
             # VALIDATION: Check if extraction makes sense for this article
-            event_type_str = parsed_data.get("event_type", "").lower()
-            summary = parsed_data.get("summary", "").lower()
-            title_lower = title.lower()
-            content_lower = content[:1000].lower()  # Check first 1000 chars
+            event_type_str = (parsed_data.get("event_type") or "").lower()
+            summary = (parsed_data.get("summary") or "").lower()
+            title_lower = (title or "").lower()
+            content_lower = (content[:1000] if content else "").lower()  # Check first 1000 chars
             
             # Check if violent event type matches article content
             # If event_type is violent but article has no violence keywords, change to "other"
