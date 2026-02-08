@@ -32,8 +32,8 @@ nginx/ssl/
 *~
 
 # Documentation (contains sensitive deployment info)
-doc/
-!doc/USER_GUIDE.md
+# doc/
+# !doc/USER_GUIDE.md
 
 # Logs
 logs/*.log
