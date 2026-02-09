@@ -25,7 +25,14 @@ interface SearchFormProps {
   onEventReceived?: (event: EventData) => void;
   onSearchComplete?: (summary: { message: string; total_events: number }) => void;
   onError?: (error: string) => void;
-  onSocialResults?: (results: SocialSearchResult[], query: string, sites: string[]) => void;
+  onSocialResults?: (results: SocialSearchResult[], query: string, sites: string[], counts?: {
+    total: number;
+    youtube: number;
+    twitter: number;
+    facebook: number;
+    instagram: number;
+    google: number;
+  }) => void;
 }
 
 // Helper function to get user-friendly event type labels
@@ -290,27 +297,16 @@ const SearchForm: React.FC<SearchFormProps> = ({
           console.log(`Enhanced query: "${enhancedQuery}" (original: "${formData.phrase}")`);
           console.log(`Selected platforms: ${selectedPlatforms.join(', ')}`);
           
-          const socialResults = await apiService.socialSearch(enhancedQuery, selectedPlatforms);
+          // Start with 10 results per site, will fetch more on demand
+          const socialResults = await apiService.socialSearch(enhancedQuery, selectedPlatforms, 10);
           
-          // Pass results to parent component for display
+          // Pass results to parent component for display (including counts)
           if (onSocialResults) {
-            onSocialResults(socialResults.results, socialResults.query, socialResults.sites);
+            onSocialResults(socialResults.results, socialResults.query, socialResults.sites, socialResults.counts);
           }
           
-          // Show completion message
+          // Clear loading state
           setLoading(false);
-          if (onSearchComplete) {
-            // Create platform labels for display
-            const platformLabels = selectedPlatforms.map(site => {
-              const platform = allPlatforms.find(p => p.id === site);
-              return platform ? platform.label : site;
-            }).join(', ');
-            
-            onSearchComplete({
-              message: `Social search completed. Found ${socialResults.total_results} results from ${platformLabels}`,
-              total_events: socialResults.total_results,
-            });
-          }
           
           // Exit early - don't run regular search
           return;
@@ -318,7 +314,22 @@ const SearchForm: React.FC<SearchFormProps> = ({
         } catch (socialError) {
           console.error('Social search failed:', socialError);
           setLoading(false);
-          const errorMessage = socialError instanceof Error ? socialError.message : 'Social search failed';
+          
+          // Extract error message from axios error response
+          let errorMessage = 'Social search failed';
+          if (socialError && typeof socialError === 'object') {
+            const axiosError = socialError as any;
+            if (axiosError.response?.data?.detail) {
+              errorMessage = axiosError.response.data.detail;
+            } else if (axiosError.response?.status === 429) {
+              errorMessage = 'Rate limit exceeded. Please try again later.';
+            } else if (axiosError.message) {
+              errorMessage = axiosError.message;
+            }
+          } else if (socialError instanceof Error) {
+            errorMessage = socialError.message;
+          }
+          
           setError(errorMessage);
           if (onError) {
             onError(errorMessage);
@@ -362,7 +373,22 @@ const SearchForm: React.FC<SearchFormProps> = ({
       });
     } catch (err) {
       console.error('Search error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred while searching. Please try again.';
+      
+      // Extract error message from axios error response
+      let errorMessage = 'An error occurred while searching. Please try again.';
+      if (err && typeof err === 'object') {
+        const axiosError = err as any;
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail;
+        } else if (axiosError.response?.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (axiosError.message) {
+          errorMessage = axiosError.message;
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      
       setError(errorMessage);
       setLoading(false);
       if (onError) {

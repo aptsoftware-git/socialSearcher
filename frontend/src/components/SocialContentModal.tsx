@@ -80,7 +80,22 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
       setLoadingCache(true);
 
       try {
-        // Check localStorage first for analyzed URLs
+        // FIRST: Check if content already has extracted_event (from backend cache)
+        if (content.extracted_event) {
+          console.log('[Modal] Content already has extracted_event from backend cache');
+          setExtractedEvent(content.extracted_event);
+          setIsCached(true);
+          setLoadingCache(false);
+          
+          // Notify parent to refresh cache status immediately
+          if (onCacheUpdate) {
+            console.log('[Modal] Calling onCacheUpdate - analysis already cached');
+            onCacheUpdate();
+          }
+          return;
+        }
+        
+        // SECOND: Check localStorage for analyzed URLs
         const analyzedKey = `analyzed_${content.url}_${llmModel || 'default'}`;
         const cached = localStorage.getItem(analyzedKey);
         

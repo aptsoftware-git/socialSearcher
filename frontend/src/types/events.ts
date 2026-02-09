@@ -167,6 +167,14 @@ export interface SocialSearchResponse {
   sites: string[];
   total_results: number;
   results: SocialSearchResult[];
+  counts?: {
+    total: number;
+    youtube: number;
+    twitter: number;
+    facebook: number;
+    instagram: number;
+    google: number;
+  };
 }
 
 export interface StreamCallbacks {

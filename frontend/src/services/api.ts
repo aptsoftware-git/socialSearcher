@@ -83,11 +83,12 @@ class ApiService {
   /**
    * Search social media platforms using Google Custom Search
    */
-  async socialSearch(query: string, sites?: string[], resultsPerSite?: number): Promise<SocialSearchResponse> {
+  async socialSearch(query: string, sites?: string[], resultsPerSite?: number, startIndex?: number): Promise<SocialSearchResponse> {
     const response = await this.client.post<SocialSearchResponse>('/api/v1/social-search', {
       query: query,
       sites: sites,
-      results_per_site: resultsPerSite || 10
+      results_per_site: resultsPerSite || 10,
+      start_index: startIndex || 1
     });
     return response.data;
   }

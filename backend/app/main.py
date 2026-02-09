@@ -397,17 +397,36 @@ async def social_search(
         results = await social_search_service.search(
             query=request.query,
             sites=request.sites,
-            results_per_site=request.results_per_site
+            results_per_site=request.results_per_site,
+            start_index=request.start_index
         )
+        
+        # Calculate counts per platform (results are dictionaries, not objects)
+        youtube_results = [r for r in results if 'youtube' in r.get('source_site', '').lower() or 'youtube' in r.get('display_link', '').lower()]
+        twitter_results = [r for r in results if 'twitter' in r.get('source_site', '').lower() or 'x.com' in r.get('source_site', '').lower() or 'twitter' in r.get('display_link', '').lower() or 'x.com' in r.get('display_link', '').lower()]
+        facebook_results = [r for r in results if 'facebook' in r.get('source_site', '').lower() or 'facebook' in r.get('display_link', '').lower()]
+        instagram_results = [r for r in results if 'instagram' in r.get('source_site', '').lower() or 'instagram' in r.get('display_link', '').lower()]
+        google_results = [r for r in results if 'google' in r.get('source_site', '').lower() or 'google' in r.get('display_link', '').lower()]
         
         return SocialSearchResponse(
             status="success",
             query=request.query,
             sites=request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com'],
             total_results=len(results),
-            results=results
+            results=results,
+            counts={
+                "total": len(results),
+                "youtube": len(youtube_results),
+                "twitter": len(twitter_results),
+                "facebook": len(facebook_results),
+                "instagram": len(instagram_results),
+                "google": len(google_results)
+            }
         )
         
+    except HTTPException:
+        # Re-raise HTTPException (like 429 rate limits) so they maintain their status code
+        raise
     except Exception as e:
         logger.error(f"Social search endpoint failed: {e}", exc_info=True)
         raise HTTPException(

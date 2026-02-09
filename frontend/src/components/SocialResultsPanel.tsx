@@ -110,6 +110,22 @@ interface SocialResultsPanelProps {
   results: SocialSearchResult[];
   query: string;
   sites: string[];
+  counts?: {
+    total: number;
+    youtube: number;
+    twitter: number;
+    facebook: number;
+    instagram: number;
+    google: number;
+  };
+  onLoadMore?: (platform: string) => Promise<void>;
+  platformsExhausted?: {
+    youtube: boolean;
+    twitter: boolean;
+    facebook: boolean;
+    instagram: boolean;
+    google: boolean;
+  };
 }
 
 interface TabPanelProps {
@@ -138,7 +154,7 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query }) => {
+const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query, onLoadMore, platformsExhausted }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedContent, setSelectedContent] = useState<SocialFullContent | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -298,6 +314,13 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
     // Refresh cache status after modal closes (content or AI analysis may have been cached)
     checkCacheStatus();
   };
+  
+  // Handle Load More button click
+  const handleLoadMore = async (platform: 'youtube' | 'twitter' | 'facebook' | 'instagram' | 'google') => {
+    if (onLoadMore) {
+      await onLoadMore(platform);
+    }
+  };
 
   // Handle item selection toggle
   const handleToggleSelection = (url: string) => {
@@ -352,37 +375,40 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
       const exportItems = await Promise.all(
         itemsToExport.map(async (result) => {
           const platform = detectPlatform(result.link, result.source_site);
-          const cacheInfo = cacheStatus[result.link];
           
           let cachedContent = undefined;
           let cachedAnalysis = undefined;
 
-          // Fetch cached content/analysis if either is available
-          if (cacheInfo?.content_cached || cacheInfo?.analysis_cached) {
-            try {
-              // console.log(`Fetching content for: ${result.link.substring(0, 50)}...`);
-              const contentResponse = await apiService.fetchSocialContent({
-                url: result.link,
-                platform: platform,
-                force_refresh: false,
-                llm_model: llmModel, // Pass LLM model to fetch cached analysis
-              });
-              // console.log(`Response status: ${contentResponse.status}`);
-              if (contentResponse.status === 'success' && contentResponse.content) {
-                cachedContent = contentResponse.content;
-                // console.log(`Has extracted_event: ${!!contentResponse.content.extracted_event}`);
-                // Check if there's an extracted_event in the cached content
-                if (contentResponse.content.extracted_event) {
-                  cachedAnalysis = contentResponse.content.extracted_event;
-                  // console.log(`Analysis title: ${cachedAnalysis.title?.substring(0, 50)}...`);
-                }
+          // Always attempt to fetch cached content/analysis for ALL items during export
+          // The backend will return cached data if available, or indicate nothing is cached
+          // This ensures we don't miss any analyzed items due to stale cacheStatus
+          try {
+            console.log(`[Export] Fetching cached data for: ${result.link.substring(0, 60)}...`);
+            const contentResponse = await apiService.fetchSocialContent({
+              url: result.link,
+              platform: platform,
+              force_refresh: false,
+              llm_model: llmModel, // Pass LLM model to fetch cached analysis
+            });
+            
+            console.log(`[Export] Response status: ${contentResponse.status}, from_cache: ${contentResponse.from_cache}`);
+            
+            if (contentResponse.status === 'success' && contentResponse.content) {
+              cachedContent = contentResponse.content;
+              
+              // Check if there's an extracted_event in the cached content
+              if (contentResponse.content.extracted_event) {
+                cachedAnalysis = contentResponse.content.extracted_event;
+                console.log(`[Export] ✓ Found analysis for ${result.link.substring(0, 60)}...`);
+              } else {
+                console.log(`[Export] ✗ No analysis found for ${result.link.substring(0, 60)}...`);
               }
-            } catch (error) {
-              console.error('Failed to fetch cached content for export:', error);
+            } else {
+              console.log(`[Export] ✗ No cached content for ${result.link.substring(0, 60)}...`);
             }
-          } // else {
-            // console.log(`Skipping fetch for ${result.link.substring(0, 50)}... - No cache`);
-          // }
+          } catch (error) {
+            console.error(`[Export] Failed to fetch cached content: ${error}`);
+          }
 
           return {
             url: result.link,
@@ -824,20 +850,26 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
   return (
     <Box sx={{ width: '100%', mt: 3, mb: 3 }}>
       <Paper elevation={3} sx={{ p: 3 }}>
-        {/* Header */}
+        {/* Header with Result Summary */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             🔍 Social Media Search Results
           </Typography>
+          
+          {/* Result Count Summary */}
+          <Typography variant="body1" color="text.primary" sx={{ mb: 1 }}>
+            Found <strong>{results.length} results</strong> for "<strong>{query}</strong>"
+          </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Found <strong>{results.length}</strong> results for "<strong>{query}</strong>"
-            {' '}({youtubeResults.length} YouTube, {twitterResults.length} Twitter/X, 
-            {facebookResults.length} Facebook, {instagramResults.length} Instagram,
-            {' '}{googleResults.length} Google
+            ({youtubeResults.length} YouTube, {twitterResults.length} Twitter/X, 
+            {facebookResults.length} Facebook, {instagramResults.length} Instagram, 
+            {googleResults.length} Google
             {otherResults.length > 0 && `, ${otherResults.length} Other`})
           </Typography>
-          <Alert severity="info" sx={{ mt: 2 }}>
-            These results are from social media platforms (YouTube, Twitter/X, Facebook, Instagram). Click on any link to view the original post.
+          
+          {/* Info Message */}
+          <Alert severity="info" sx={{ mt: 1, mb: 2 }}>
+            These results are from social media platforms. Click "View Full Content" to see details and analyze with AI.
           </Alert>
         </Box>
 
@@ -852,35 +884,35 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
           >
             <Tab 
               icon={<Badge badgeContent={youtubeResults.length} color="error"><YouTubeIcon /></Badge>}
-              label="YouTube" 
+              label={`YouTube (${youtubeResults.length})`}
               id="social-tab-0"
               aria-controls="social-tabpanel-0"
               sx={{ fontWeight: 600 }}
             />
             <Tab 
               icon={<Badge badgeContent={twitterResults.length} color="info"><TwitterIcon /></Badge>}
-              label="Twitter / X" 
+              label={`Twitter/X (${twitterResults.length})`}
               id="social-tab-1"
               aria-controls="social-tabpanel-1"
               sx={{ fontWeight: 600 }}
             />
             <Tab 
               icon={<Badge badgeContent={facebookResults.length} color="primary"><FacebookIcon /></Badge>}
-              label="Facebook" 
+              label={`Facebook (${facebookResults.length})`}
               id="social-tab-2"
               aria-controls="social-tabpanel-2"
               sx={{ fontWeight: 600 }}
             />
             <Tab 
               icon={<Badge badgeContent={instagramResults.length} color="warning"><InstagramIcon /></Badge>}
-              label="Instagram" 
+              label={`Instagram (${instagramResults.length})`}
               id="social-tab-3"
               aria-controls="social-tabpanel-3"
               sx={{ fontWeight: 600 }}
             />
             <Tab 
               icon={<Badge badgeContent={googleResults.length} color="success"><GoogleIcon /></Badge>}
-              label="Google" 
+              label={`Google (${googleResults.length})`}
               id="social-tab-4"
               aria-controls="social-tabpanel-4"
               sx={{ fontWeight: 600 }}
@@ -938,6 +970,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   renderResultCard(result, index, youtubeResults.length)
                 )}
               </Stack>
+              
+              {/* Load More Button - Disabled when no more results available */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleLoadMore('youtube')}
+                  disabled={exporting || platformsExhausted?.youtube}
+                >
+                  {platformsExhausted?.youtube ? 'No More Results' : 'Load More'}
+                </Button>
+              </Box>
             </>
           ) : (
             <Alert severity="info">
@@ -987,6 +1030,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   renderResultCard(result, index, twitterResults.length)
                 )}
               </Stack>
+              
+              {/* Load More Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleLoadMore('twitter')}
+                  disabled={exporting || platformsExhausted?.twitter}
+                >
+                  {platformsExhausted?.twitter ? 'No More Results' : 'Load More'}
+                </Button>
+              </Box>
             </>
           ) : (
             <Alert severity="info">
@@ -1036,6 +1090,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   renderResultCard(result, index, facebookResults.length)
                 )}
               </Stack>
+              
+              {/* Load More Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleLoadMore('facebook')}
+                  disabled={exporting || platformsExhausted?.facebook}
+                >
+                  {platformsExhausted?.facebook ? 'No More Results' : 'Load More'}
+                </Button>
+              </Box>
             </>
           ) : (
             <Alert severity="info">
@@ -1085,6 +1150,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   renderResultCard(result, index, instagramResults.length)
                 )}
               </Stack>
+              
+              {/* Load More Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleLoadMore('instagram')}
+                  disabled={exporting || platformsExhausted?.instagram}
+                >
+                  {platformsExhausted?.instagram ? 'No More Results' : 'Load More'}
+                </Button>
+              </Box>
             </>
           ) : (
             <Alert severity="info">
@@ -1134,6 +1210,17 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query 
                   renderResultCard(result, index, googleResults.length)
                 )}
               </Stack>
+              
+              {/* Load More Button */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                <Button
+                  variant="contained"
+                  onClick={() => handleLoadMore('google')}
+                  disabled={exporting || platformsExhausted?.google}
+                >
+                  {platformsExhausted?.google ? 'No More Results' : 'Load More'}
+                </Button>
+              </Box>
             </>
           ) : (
             <Alert severity="info">

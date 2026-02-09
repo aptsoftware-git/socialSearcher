@@ -5,6 +5,7 @@ Google Custom Search Engine Service for Social Media Search.
 from typing import List, Dict, Any, Optional
 import json
 import httpx
+from fastapi import HTTPException
 from loguru import logger
 from app.settings import settings
 
@@ -37,7 +38,8 @@ class SocialSearchService:
         self,
         query: str,
         sites: Optional[List[str]] = None,
-        results_per_site: Optional[int] = None
+        results_per_site: Optional[int] = None,
+        start_index: int = 1
     ) -> List[Dict[str, Any]]:
         """
         Search using Google Custom Search Engine.
@@ -46,6 +48,7 @@ class SocialSearchService:
             query: Search query string
             sites: List of sites to search (e.g., ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'])
             results_per_site: Number of results to fetch per site (default: from config)
+            start_index: Starting index for pagination (1-91, increments of 10)
             
         Returns:
             List of search results with title, link, snippet, etc.
@@ -66,7 +69,7 @@ class SocialSearchService:
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             for site in sites:
-                logger.info(f"Searching {site} for: {query}")
+                logger.info(f"Searching {site} for: {query} (start_index={start_index})")
                 
                 # Special handling for google.com: use web search CSE without site: prefix
                 if site == 'google.com':
@@ -80,7 +83,8 @@ class SocialSearchService:
                             client=client,
                             query=query,  # No site: prefix
                             max_results=results_per_site,
-                            search_engine_id=self.google_web_search_id  # Use web search CSE
+                            search_engine_id=self.google_web_search_id,  # Use web search CSE
+                            start_index=start_index
                         )
                         
                         # Add site information to each result
@@ -90,6 +94,9 @@ class SocialSearchService:
                         all_results.extend(results)
                         logger.info(f"Found {len(results)} results from google.com (web search)")
                         
+                    except HTTPException as e:
+                        # Re-raise HTTPException (like rate limits) so they propagate
+                        raise
                     except Exception as e:
                         logger.error(f"Error searching google.com: {e}")
                         continue
@@ -101,7 +108,8 @@ class SocialSearchService:
                         results = await self._fetch_results(
                             client=client,
                             query=site_query,
-                            max_results=results_per_site
+                            max_results=results_per_site,
+                            start_index=start_index
                         )
                         
                         # Add site information to each result
@@ -111,6 +119,9 @@ class SocialSearchService:
                         all_results.extend(results)
                         logger.info(f"Found {len(results)} results from {site}")
                         
+                    except HTTPException as e:
+                        # Re-raise HTTPException (like rate limits) so they propagate
+                        raise
                     except Exception as e:
                         logger.error(f"Error searching {site}: {e}")
                         continue
@@ -123,7 +134,8 @@ class SocialSearchService:
         client: httpx.AsyncClient,
         query: str,
         max_results: int = 10,
-        search_engine_id: Optional[str] = None
+        search_engine_id: Optional[str] = None,
+        start_index: int = 1
     ) -> List[Dict[str, Any]]:
         """
         Fetch results from Google Custom Search API.
@@ -133,6 +145,7 @@ class SocialSearchService:
             query: Search query
             max_results: Maximum number of results to fetch
             search_engine_id: Optional custom search engine ID (defaults to self.search_engine_id)
+            start_index: Starting index for pagination (1-91, increments of 10)
             
         Returns:
             List of search results
@@ -140,7 +153,8 @@ class SocialSearchService:
         # Use provided search engine ID or default
         cse_id = search_engine_id if search_engine_id else self.search_engine_id
         results = []
-        start_index = 1
+        # Use the provided start_index instead of always starting from 1
+        current_index = start_index
         
         # Google CSE returns max 10 results per request
         # We need to paginate to get more
@@ -150,7 +164,7 @@ class SocialSearchService:
                     'key': self.api_key,
                     'cx': cse_id,  # Use the selected CSE ID
                     'q': query,
-                    'start': start_index,
+                    'start': current_index,
                     'num': min(10, max_results - len(results))  # Max 10 per request
                 }
                 
@@ -204,9 +218,16 @@ class SocialSearchService:
                 if 'nextPage' not in data.get('queries', {}):
                     break
                 
-                start_index += 10
+                current_index += 10
                 
             except httpx.HTTPStatusError as e:
+                # Re-raise rate limit errors so they propagate to the endpoint
+                if e.response.status_code == 429:
+                    logger.error(f"Rate limit exceeded: {e.response.status_code} - {e.response.text}")
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Search limit exceeded. Daily quota for Google Custom Search API has been reached. Please try again tomorrow."
+                    )
                 logger.error(f"HTTP error during Google CSE search: {e.response.status_code} - {e.response.text}")
                 break
             except Exception as e:

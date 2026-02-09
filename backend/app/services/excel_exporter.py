@@ -28,6 +28,32 @@ class ExcelExporter:
         """Initialize the Excel exporter."""
         logger.info("ExcelExporter initialized")
     
+    def _format_event_type(self, event_type) -> str:
+        """
+        Format event type enum/string to readable format.
+        
+        Args:
+            event_type: EventType enum or string value
+        
+        Returns:
+            Formatted event type string (e.g., "Accident" instead of "EventType.ACCIDENT" or "accident")
+        """
+        if event_type is None:
+            return ''
+        
+        # If it's an enum, get its value
+        if isinstance(event_type, EventType):
+            event_type = event_type.value
+        
+        # If it's still a string representation of enum (e.g., "EventType.ACCIDENT")
+        if isinstance(event_type, str) and 'EventType.' in event_type:
+            event_type = event_type.split('.')[-1].lower()
+        
+        # Convert to string and format: replace underscores with spaces and title case
+        event_type_str = str(event_type).replace('_', ' ').title()
+        
+        return event_type_str
+    
     def _create_header_style(self) -> dict:
         """
         Create header cell styling.
@@ -599,6 +625,7 @@ class ExcelExporter:
             "Event Title",
             "Event Summary",
             "Event Type",
+            "Event Sub-Type",
             "Perpetrator",
             "Location (Full Text)",
             "City",
@@ -668,8 +695,11 @@ class ExcelExporter:
             if cached_analysis:
                 ws.cell(row=row_idx, column=17, value=cached_analysis.get('title', ''))
                 ws.cell(row=row_idx, column=18, value=cached_analysis.get('summary', ''))
-                ws.cell(row=row_idx, column=19, value=cached_analysis.get('event_type', ''))
-                ws.cell(row=row_idx, column=20, value=cached_analysis.get('perpetrator', ''))
+                # Format event_type properly (convert from enum to readable string)
+                event_type_value = self._format_event_type(cached_analysis.get('event_type', ''))
+                ws.cell(row=row_idx, column=19, value=event_type_value)
+                ws.cell(row=row_idx, column=20, value=cached_analysis.get('event_sub_type', ''))
+                ws.cell(row=row_idx, column=21, value=cached_analysis.get('perpetrator', ''))
                 
                 location = cached_analysis.get('location') or {}  # Handle None location
                 location_parts = []
@@ -683,22 +713,22 @@ class ExcelExporter:
                     location_parts.append(location['country'])
                 location_full = ', '.join(location_parts)
                 
-                ws.cell(row=row_idx, column=21, value=location_full)
-                ws.cell(row=row_idx, column=22, value=location.get('city', '') if location else '')
-                ws.cell(row=row_idx, column=23, value=location.get('state', '') if location else '')
-                ws.cell(row=row_idx, column=24, value=location.get('country', '') if location else '')
+                ws.cell(row=row_idx, column=22, value=location_full)
+                ws.cell(row=row_idx, column=23, value=location.get('city', '') if location else '')
+                ws.cell(row=row_idx, column=24, value=location.get('state', '') if location else '')
+                ws.cell(row=row_idx, column=25, value=location.get('country', '') if location else '')
                 
                 # Sanitize event_date to remove timezone info
                 event_date = self._sanitize_datetime_string(cached_analysis.get('event_date', ''))
-                ws.cell(row=row_idx, column=25, value=event_date)
-                ws.cell(row=row_idx, column=26, value=cached_analysis.get('event_time', ''))
-                ws.cell(row=row_idx, column=27, value=self._format_list(cached_analysis.get('participants', [])))
-                ws.cell(row=row_idx, column=28, value=self._format_list(cached_analysis.get('organizations', [])))
+                ws.cell(row=row_idx, column=26, value=event_date)
+                ws.cell(row=row_idx, column=27, value=cached_analysis.get('event_time', ''))
+                ws.cell(row=row_idx, column=28, value=self._format_list(cached_analysis.get('participants', [])))
+                ws.cell(row=row_idx, column=29, value=self._format_list(cached_analysis.get('organizations', [])))
                 
                 casualties = cached_analysis.get('casualties') or {}  # Handle None casualties
-                ws.cell(row=row_idx, column=29, value=casualties.get('killed', '') if casualties else '')
-                ws.cell(row=row_idx, column=30, value=casualties.get('injured', '') if casualties else '')
-                ws.cell(row=row_idx, column=31, value=cached_analysis.get('confidence', ''))
+                ws.cell(row=row_idx, column=30, value=casualties.get('killed', '') if casualties else '')
+                ws.cell(row=row_idx, column=31, value=casualties.get('injured', '') if casualties else '')
+                ws.cell(row=row_idx, column=32, value=cached_analysis.get('confidence', ''))
             
             # Apply style to all cells in this row
             for col_idx in range(1, len(headers) + 1):

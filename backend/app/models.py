@@ -335,6 +335,7 @@ class SocialSearchRequest(BaseModel):
     query: str = Field(..., description="Search query string")
     sites: Optional[List[str]] = Field(None, description="List of sites to search (e.g., ['youtube.com', 'x.com', 'facebook.com', 'instagram.com'])")
     results_per_site: int = Field(10, ge=1, le=100, description="Number of results to fetch per site")
+    start_index: int = Field(1, ge=1, le=91, description="Starting index for pagination (1-91, increments of 10)")
 
 
 class SocialSearchResult(BaseModel):
@@ -355,6 +356,7 @@ class SocialSearchResponse(BaseModel):
     sites: List[str]
     total_results: int
     results: List[SocialSearchResult]
+    counts: Optional[Dict[str, int]] = None  # Platform-wise counts
 
 
 # ===== Social Media Full Content Models =====

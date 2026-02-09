@@ -9,6 +9,7 @@ import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
+import { apiService } from './services/api';
 import logoImage from './assets/defenderosint.webp';
 import makeInIndiaLogo from './assets/Make_In_India.png';
 import './App.css';
@@ -49,6 +50,29 @@ function App() {
   const [socialResults, setSocialResults] = useState<SocialSearchResult[]>([]);
   const [socialSearchQuery, setSocialSearchQuery] = useState<string>('');
   const [socialSearchSites, setSocialSearchSites] = useState<string[]>([]);
+  const [socialSearchCounts, setSocialSearchCounts] = useState<{
+    total: number;
+    youtube: number;
+    twitter: number;
+    facebook: number;
+    instagram: number;
+    google: number;
+  } | undefined>(undefined);
+  
+  // Track which platforms have no more results available
+  const [platformsExhausted, setPlatformsExhausted] = useState<{
+    youtube: boolean;
+    twitter: boolean;
+    facebook: boolean;
+    instagram: boolean;
+    google: boolean;
+  }>({
+    youtube: false,
+    twitter: false,
+    facebook: false,
+    instagram: false,
+    google: false,
+  });
 
   // Check authentication on mount
   useEffect(() => {
@@ -92,12 +116,139 @@ function App() {
     setSocialResults([]);
     setSocialSearchQuery('');
     setSocialSearchSites([]);
+    setSocialSearchCounts(undefined);
   };
 
-  const handleSocialSearchResults = (results: SocialSearchResult[], query: string, sites: string[]) => {
+  const handleSocialSearchResults = (
+    results: SocialSearchResult[], 
+    query: string, 
+    sites: string[],
+    counts?: {
+      total: number;
+      youtube: number;
+      twitter: number;
+      facebook: number;
+      instagram: number;
+      google: number;
+    }
+  ) => {
     setSocialResults(results);
     setSocialSearchQuery(query);
     setSocialSearchSites(sites);
+    setSocialSearchCounts(counts);
+    
+    // Reset exhausted platforms state for new search
+    setPlatformsExhausted({
+      youtube: false,
+      twitter: false,
+      facebook: false,
+      instagram: false,
+      google: false,
+    });
+  };
+
+  const handleLoadMoreResults = async (platform: string) => {
+    if (!socialSearchQuery) return;
+    
+    try {
+      // Map platform name to site URL
+      const platformMap: {[key: string]: string} = {
+        'youtube': 'youtube.com',
+        'twitter': 'x.com',
+        'facebook': 'facebook.com',
+        'instagram': 'instagram.com',
+        'google': 'google.com'
+      };
+      
+      const siteUrl = platformMap[platform];
+      if (!siteUrl) return;
+      
+      // Count current results for this platform
+      const currentPlatformResults = socialResults.filter((r: SocialSearchResult) => 
+        r.source_site.toLowerCase().includes(platform) || 
+        r.display_link.toLowerCase().includes(platform) ||
+        (platform === 'twitter' && (r.source_site.toLowerCase().includes('x.com') || r.display_link.toLowerCase().includes('x.com')))
+      );
+      
+      const currentCount = currentPlatformResults.length;
+      const nextStartIndex = currentCount + 1; // Google CSE uses 1-based indexing
+      
+      // Check if we've reached the maximum limit (Google CSE allows start_index 1-91)
+      if (nextStartIndex > 91) {
+        console.log(`[${platform}] Reached maximum limit (start_index would be ${nextStartIndex}, max is 91)`);
+        setPlatformsExhausted(prev => ({
+          ...prev,
+          [platform]: true
+        }));
+        alert('Maximum result limit reached for this platform. Google Custom Search API allows up to 100 results per search.');
+        return;
+      }
+      
+      console.log(`[${platform}] Current loaded results: ${currentCount}, requesting from index: ${nextStartIndex}`);
+      console.log(`[${platform}] Requesting from site: ${siteUrl}`);
+      console.log(`[${platform}] Current platformsExhausted state:`, platformsExhausted);
+      
+      // Fetch next 10 results for this platform only
+      const newResults = await apiService.socialSearch(socialSearchQuery, [siteUrl], 10, nextStartIndex);
+      
+      console.log(`[${platform}] API Response - total_results: ${newResults.total_results}, results.length: ${newResults.results.length}`);
+      
+      // Check if API returned any results at all
+      if (newResults.results.length === 0) {
+        // API returned no results - mark this platform as exhausted
+        console.log(`[${platform}] No more results available from API (start_index: ${nextStartIndex})`);
+        setPlatformsExhausted(prev => ({
+          ...prev,
+          [platform]: true
+        }));
+        return;
+      }
+      
+      // API returned results - now filter out duplicates
+      const existingUrls = new Set(socialResults.map((r: SocialSearchResult) => r.link));
+      const uniqueNewResults = newResults.results.filter((r: SocialSearchResult) => !existingUrls.has(r.link));
+      
+      // Add unique results if any
+      if (uniqueNewResults.length > 0) {
+        console.log(`[${platform}] Added ${uniqueNewResults.length} new unique results`);
+        setSocialResults([...socialResults, ...uniqueNewResults]);
+      } else {
+        // All results were duplicates - mark as exhausted
+        console.log(`[${platform}] All ${newResults.results.length} results were duplicates, marking as exhausted`);
+        setPlatformsExhausted(prev => ({
+          ...prev,
+          [platform]: true
+        }));
+      }
+    } catch (error) {
+      console.error(`[${platform}] Load More failed:`, error);
+      
+      // Extract error message from axios error response
+      let errorMessage = 'Failed to load more results';
+      if (error && typeof error === 'object') {
+        const axiosError = error as any;
+        if (axiosError.response?.data?.detail) {
+          errorMessage = axiosError.response.data.detail;
+        } else if (axiosError.response?.status === 422) {
+          // Validation error - likely hit the start_index limit
+          errorMessage = 'Maximum result limit reached for this platform. Google Custom Search API allows up to 100 results per search.';
+          // Mark platform as exhausted
+          setPlatformsExhausted(prev => ({
+            ...prev,
+            [platform]: true
+          }));
+        } else if (axiosError.response?.status === 429) {
+          errorMessage = 'Search limit exceeded. Daily quota has been reached. Please try again tomorrow.';
+        } else if (axiosError.message) {
+          errorMessage = axiosError.message;
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      // Display error to user via alert
+      alert(errorMessage);
+    }
   };
 
   const handleProgress = (progressUpdate: ProgressUpdate) => {
@@ -219,6 +370,9 @@ function App() {
                 results={socialResults}
                 query={socialSearchQuery}
                 sites={socialSearchSites}
+                counts={socialSearchCounts}
+                onLoadMore={handleLoadMoreResults}
+                platformsExhausted={platformsExhausted}
               />
             </Container>
           )}
