@@ -57,8 +57,7 @@ const SocialContentModal: React.FC<SocialContentModalProps> = ({
   // Helper function to proxy Instagram images through backend (fixes CORS issues)
   const getProxiedImageUrl = (url: string, platform: string): string => {
     if (platform === 'instagram' && url) {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'https://localhost:8000';
-      return `${apiBaseUrl}/api/v1/proxy-image?url=${encodeURIComponent(url)}`;
+      return `/api/v1/proxy-image?url=${encodeURIComponent(url)}`;
     }
     return url;
   };

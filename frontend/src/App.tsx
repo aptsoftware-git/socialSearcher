@@ -7,6 +7,7 @@ import LLMConfigDropdown from './components/LLMConfigDropdown';
 import SocialResultsPanel from './components/SocialResultsPanel';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
+import ProfileMenu from './components/ProfileMenu';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import { apiService } from './services/api';
@@ -30,6 +31,8 @@ interface User {
   email: string;
   username: string;
   full_name?: string;
+  company?: string;
+  profile_image_url?: string;
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
@@ -99,12 +102,24 @@ function App() {
     setIsAuthenticated(true);
   };
 
+  const handleUserUpdate = (updatedUser: User) => {
+    setUser(updatedUser);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
+  };
+
+  // Helper function to get display name (company > full_name > username)
+  const getDisplayName = () => {
+    if (!user) return '';
+    if (user.company) return user.company;
+    if (user.full_name) return user.full_name;
+    return user.username;
   };
 
   const handleSearchStart = () => {
@@ -333,9 +348,10 @@ function App() {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               <Box component="span" sx={{ fontWeight: 'bold' }}>Tiger OSINT</Box> - AI based customized web scrapper
             </Typography>
-            <Typography variant="body2" sx={{ mr: 2 }}>
-              {user?.email}
+            <Typography variant="body2" sx={{ mr: 1 }}>
+              {getDisplayName()}
             </Typography>
+            {user && <ProfileMenu user={user} onUserUpdate={handleUserUpdate} />}
             <LLMConfigDropdown />
             <Box sx={{ ml: 2 }}>
               <Typography 

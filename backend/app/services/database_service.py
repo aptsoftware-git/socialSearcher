@@ -57,7 +57,7 @@ class DatabaseService:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, email, username, password_hash, full_name, 
+                    SELECT id, email, username, password_hash, full_name, company, profile_image_url,
                            is_active, is_admin, created_at, updated_at, last_login
                     FROM users 
                     WHERE email = %s
@@ -80,7 +80,7 @@ class DatabaseService:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, email, username, password_hash, full_name, 
+                    SELECT id, email, username, password_hash, full_name, company, profile_image_url,
                            is_active, is_admin, created_at, updated_at, last_login
                     FROM users 
                     WHERE id = %s
@@ -103,7 +103,7 @@ class DatabaseService:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, email, username, full_name, 
+                    SELECT id, email, username, full_name, company, profile_image_url,
                            is_active, is_admin, created_at, last_login
                     FROM users 
                     ORDER BY created_at DESC
@@ -118,7 +118,7 @@ class DatabaseService:
                 self.return_connection(conn)
     
     def create_user(self, email: str, username: str, password_hash: str, 
-                   full_name: Optional[str] = None, is_admin: bool = False) -> Optional[Dict[str, Any]]:
+                   full_name: Optional[str] = None, company: Optional[str] = None, is_admin: bool = False) -> Optional[Dict[str, Any]]:
         """Create new user."""
         conn = None
         try:
@@ -126,11 +126,11 @@ class DatabaseService:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    INSERT INTO users (email, username, password_hash, full_name, is_admin)
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING id, email, username, full_name, is_active, is_admin, created_at
+                    INSERT INTO users (email, username, password_hash, full_name, company, is_admin)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id, email, username, full_name, company, profile_image_url, is_active, is_admin, created_at
                     """,
-                    (email, username, password_hash, full_name, is_admin)
+                    (email, username, password_hash, full_name, company, is_admin)
                 )
                 user = cur.fetchone()
                 conn.commit()
@@ -154,7 +154,7 @@ class DatabaseService:
         conn = None
         try:
             # Build dynamic update query
-            allowed_fields = ['email', 'username', 'password_hash', 'full_name', 'is_active']
+            allowed_fields = ['email', 'username', 'password_hash', 'full_name', 'company', 'profile_image_url', 'is_active']
             update_fields = []
             values = []
             
@@ -175,7 +175,7 @@ class DatabaseService:
                     UPDATE users 
                     SET {', '.join(update_fields)}
                     WHERE id = %s
-                    RETURNING id, email, username, full_name, is_active, is_admin, created_at, updated_at
+                    RETURNING id, email, username, full_name, company, profile_image_url, is_active, is_admin, created_at, updated_at
                     """,
                     values
                 )

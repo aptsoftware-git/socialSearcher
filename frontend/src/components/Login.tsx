@@ -38,8 +38,7 @@ const Login = ({ onLoginSuccess }: LoginProps) => {
     setLoading(true);
 
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://tigerosint.aptsoftware.in';
-      const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+      const response = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

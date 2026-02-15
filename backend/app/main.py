@@ -131,7 +131,7 @@ async def root_health_check():
     return {"status": "healthy"}
 
 
-@app.get("/api/v1/health")
+@app.get("/v1/health")
 async def health_check():
     """
     Detailed health check endpoint with database connectivity.
@@ -152,7 +152,7 @@ async def health_check():
     return health_status
 
 
-@app.get("/api/v1/ollama/status")
+@app.get("/v1/ollama/status")
 async def ollama_status():
     """
     Check Ollama connection status.
@@ -187,7 +187,7 @@ async def ollama_status():
         }
 
 
-@app.get("/api/v1/llm/status")
+@app.get("/v1/llm/status")
 async def llm_status():
     """
     Get status of all LLM providers (Ollama and Claude).
@@ -209,7 +209,7 @@ async def llm_status():
         }
 
 
-@app.get("/api/v1/llm/models")
+@app.get("/v1/llm/models")
 async def llm_models():
     """
     List all available LLM models from all providers.
@@ -231,7 +231,7 @@ async def llm_models():
         }
 
 
-@app.get("/api/v1/llm/usage")
+@app.get("/v1/llm/usage")
 async def llm_usage():
     """
     Get Claude API usage statistics.
@@ -253,7 +253,7 @@ async def llm_usage():
         }
 
 
-@app.post("/api/v1/llm/reset-stats")
+@app.post("/v1/llm/reset-stats")
 async def llm_reset_stats():
     """
     Reset Claude API usage statistics.
@@ -290,17 +290,17 @@ async def root():
         "version": "1.0.0",
         "status": "running",
         "endpoints": {
-            "health": "/api/v1/health",
-            "ollama_status": "/api/v1/ollama/status",
-            "llm_status": "/api/v1/llm/status",
-            "llm_models": "/api/v1/llm/models",
-            "llm_usage": "/api/v1/llm/usage",
-            "llm_reset_stats": "/api/v1/llm/reset-stats",
-            "sources": "/api/v1/sources",
-            "search": "/api/v1/search",
-            "export_excel": "/api/v1/export/excel",
-            "extract_event": "/api/v1/extract/event",
-            "extract_event_simple": "/api/v1/extract/event/simple",
+            "health": "/v1/health",
+            "ollama_status": "/v1/ollama/status",
+            "llm_status": "/v1/llm/status",
+            "llm_models": "/v1/llm/models",
+            "llm_usage": "/v1/llm/usage",
+            "llm_reset_stats": "/v1/llm/reset-stats",
+            "sources": "/v1/sources",
+            "search": "/v1/search",
+            "export_excel": "/v1/export/excel",
+            "extract_event": "/v1/extract/event",
+            "extract_event_simple": "/v1/extract/event/simple",
             "docs": "/docs",
             "redoc": "/redoc"
         }
@@ -309,7 +309,7 @@ async def root():
 
 # Configuration Endpoints
 
-@app.get("/api/v1/sources", response_model=SourcesListResponse)
+@app.get("/v1/sources", response_model=SourcesListResponse)
 async def get_sources(enabled_only: bool = True):
     """
     Get list of configured news sources.
@@ -342,7 +342,7 @@ async def get_sources(enabled_only: bool = True):
 
 # Social Search Endpoint
 
-@app.post("/api/v1/social-search", response_model=SocialSearchResponse)
+@app.post("/v1/social-search", response_model=SocialSearchResponse)
 async def social_search(
     request: SocialSearchRequest,
     current_user: TokenData = Depends(get_current_active_user)
@@ -437,7 +437,7 @@ async def social_search(
 
 # Social Content Fetch Endpoint
 
-@app.post("/api/v1/social-content/fetch", response_model=FetchContentResponse)
+@app.post("/v1/social-content/fetch", response_model=FetchContentResponse)
 async def fetch_social_content(
     request: FetchContentRequest,
     current_user: TokenData = Depends(get_current_active_user)
@@ -542,7 +542,7 @@ async def fetch_social_content(
 
 # Cache Status Check Endpoint
 
-@app.post("/api/v1/social-content/cache-status")
+@app.post("/v1/social-content/cache-status")
 async def check_cache_status(request: dict):
     """
     Check cache status for multiple social media URLs.
@@ -595,7 +595,7 @@ async def check_cache_status(request: dict):
 
 # Social Content Analysis Endpoint
 
-@app.post("/api/v1/social-content/analyse", response_model=AnalyseContentResponse)
+@app.post("/v1/social-content/analyse", response_model=AnalyseContentResponse)
 async def analyse_social_content(
     request: AnalyseContentRequest,
     current_user: TokenData = Depends(get_current_active_user)
@@ -755,7 +755,7 @@ async def analyse_social_content(
 
 # Cache Management Endpoints
 
-@app.get("/api/v1/social-content/cache/stats")
+@app.get("/v1/social-content/cache/stats")
 async def get_cache_stats():
     """Get cache statistics for social media content."""
     try:
@@ -769,7 +769,7 @@ async def get_cache_stats():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/api/v1/social-content/cache/clear")
+@app.post("/v1/social-content/cache/clear")
 async def clear_cache(platform: str = None):
     """Clear cache for specific platform or all platforms."""
     try:
@@ -785,7 +785,7 @@ async def clear_cache(platform: str = None):
 
 # Image Proxy Endpoint (for CORS bypass)
 
-@app.get("/api/v1/proxy-image")
+@app.get("/v1/proxy-image")
 async def proxy_image(url: str):
     """
     Proxy images from social media platforms to bypass CORS restrictions.
@@ -913,7 +913,7 @@ async def proxy_image(url: str):
 
 
 # OPTIONS handler for proxy-image (CORS preflight)
-@app.options("/api/v1/proxy-image")
+@app.options("/v1/proxy-image")
 async def proxy_image_options():
     """Handle CORS preflight requests for image proxy."""
     return Response(
@@ -929,7 +929,7 @@ async def proxy_image_options():
 
 # Search Endpoint
 
-@app.post("/api/v1/search", response_model=SearchResponse)
+@app.post("/v1/search", response_model=SearchResponse)
 async def search_events(
     query: SearchQuery,
     max_articles: int = 50,
@@ -997,7 +997,7 @@ async def search_events(
         )
 
 
-@app.get("/api/v1/search/stream")
+@app.get("/v1/search/stream")
 async def search_events_stream(
     phrase: str,
     location: str = None,
@@ -1155,7 +1155,7 @@ async def search_events_stream(
         )
 
 
-@app.post("/api/v1/search/cancel/{session_id}")
+@app.post("/v1/search/cancel/{session_id}")
 async def cancel_search(session_id: str):
     """
     Cancel an ongoing search session.
@@ -1209,7 +1209,7 @@ async def cancel_search(session_id: str):
         )
 
 
-@app.get("/api/v1/search/session/{session_id}")
+@app.get("/v1/search/session/{session_id}")
 async def get_session_results(session_id: str):
     """
     Retrieve results from a previous search session.
@@ -1247,7 +1247,7 @@ async def get_session_results(session_id: str):
 
 # Excel Export Endpoints
 
-@app.post("/api/v1/export/excel")
+@app.post("/v1/export/excel")
 async def export_events_to_excel(session_id: str, include_metadata: bool = True):
     """
     Export events from a session to Excel file.
@@ -1310,7 +1310,7 @@ async def export_events_to_excel(session_id: str, include_metadata: bool = True)
         )
 
 
-@app.post("/api/v1/export/excel/custom")
+@app.post("/v1/export/excel/custom")
 async def export_custom_events_to_excel(
     events: list[EventData],
     include_metadata: bool = True
@@ -1374,7 +1374,7 @@ async def export_custom_events_to_excel(
         )
 
 
-@app.post("/api/v1/export/social-events")
+@app.post("/v1/export/social-events")
 async def export_social_events(
     request: ExportSocialEventsRequest
 ):
@@ -1465,7 +1465,7 @@ async def export_social_events(
 
 # Event Extraction Endpoints
 
-@app.post("/api/v1/extract/event", response_model=EventData)
+@app.post("/v1/extract/event", response_model=EventData)
 async def extract_event_from_text(article: ArticleContent):
     """
     Extract event data from article content using Ollama LLM.
@@ -1502,7 +1502,7 @@ async def extract_event_from_text(article: ArticleContent):
         raise HTTPException(status_code=500, detail=f"Event extraction failed: {str(e)}")
 
 
-@app.post("/api/v1/extract/event/simple")
+@app.post("/v1/extract/event/simple")
 async def extract_event_simple(
     title: str,
     content: str,
@@ -1550,7 +1550,7 @@ async def extract_event_simple(
 
 
 # Development/Testing endpoint
-@app.get("/api/v1/test/ollama")
+@app.get("/v1/test/ollama")
 async def test_ollama_generation():
     """
     Test Ollama generation with a simple prompt.

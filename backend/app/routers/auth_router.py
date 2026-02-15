@@ -20,8 +20,8 @@ from app.auth import (
 )
 from app.services.database_service import db_service
 
-router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
-user_router = APIRouter(prefix="/api/v1/users", tags=["users"])
+router = APIRouter(prefix="/v1/auth", tags=["authentication"])
+user_router = APIRouter(prefix="/v1/users", tags=["users"])
 
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
@@ -83,6 +83,8 @@ async def login(login_data: LoginRequest):
             email=user['email'],
             username=user['username'],
             full_name=user.get('full_name'),
+            company=user.get('company'),
+            profile_image_url=user.get('profile_image_url'),
             is_active=user['is_active'],
             is_admin=user['is_admin'],
             created_at=user['created_at'],
@@ -175,6 +177,8 @@ async def get_current_user_info(current_user: TokenData = Depends(get_current_ac
         email=user['email'],
         username=user['username'],
         full_name=user.get('full_name'),
+        company=user.get('company'),
+        profile_image_url=user.get('profile_image_url'),
         is_active=user['is_active'],
         is_admin=user['is_admin'],
         created_at=user['created_at'],
@@ -197,10 +201,13 @@ async def change_password(
     Returns:
         Success message
     """
+    logger.info(f"User {current_user.username} (ID: {current_user.user_id}) attempting to change password")
+    
     # Get user from database
     user = db_service.get_user_by_id(current_user.user_id)
     
     if not user:
+        logger.error(f"User {current_user.user_id} not found in database")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -208,6 +215,7 @@ async def change_password(
     
     # Verify old password
     if not verify_password(password_data.old_password, user['password_hash']):
+        logger.warning(f"User {current_user.username} provided incorrect current password")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect current password",
@@ -216,6 +224,7 @@ async def change_password(
     # Validate new password strength
     is_valid, error_msg = validate_password_strength(password_data.new_password)
     if not is_valid:
+        logger.warning(f"User {current_user.username} new password failed validation: {error_msg}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_msg,
@@ -223,15 +232,66 @@ async def change_password(
     
     # Update password
     password_hash = get_password_hash(password_data.new_password)
+    logger.info(f"Updating password for user {current_user.username} (ID: {current_user.user_id})")
     updated = db_service.update_user(current_user.user_id, password_hash=password_hash)
     
     if not updated:
+        logger.error(f"Failed to update password for user {current_user.user_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update password",
         )
     
+    logger.info(f"Password successfully changed for user {current_user.username} (ID: {current_user.user_id})")
     return {"message": "Password changed successfully"}
+
+
+@router.put("/me", response_model=UserResponse)
+async def update_own_profile(
+    user_data: UpdateUserRequest,
+    current_user: TokenData = Depends(get_current_active_user)
+):
+    """
+    Update own user profile (non-admin users can update their own profile).
+    
+    Args:
+        user_data: Updated profile data
+        current_user: Current authenticated user
+    
+    Returns:
+        Updated user information
+    """
+    # Users can only update their own full_name, company, and profile_image_url
+    # They cannot change email, username, is_active, or is_admin
+    update_params = {}
+    
+    if user_data.full_name is not None:
+        update_params['full_name'] = user_data.full_name
+    
+    if user_data.company is not None:
+        update_params['company'] = user_data.company
+    
+    if user_data.profile_image_url is not None:
+        update_params['profile_image_url'] = user_data.profile_image_url
+    
+    if not update_params:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No valid fields to update",
+        )
+    
+    # Update user
+    updated_user = db_service.update_user(current_user.user_id, **update_params)
+    
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or update failed",
+        )
+    
+    logger.info(f"User {current_user.username} updated their profile")
+    
+    return UserResponse(**updated_user)
 
 
 # ==================== USER MANAGEMENT ENDPOINTS (ADMIN ONLY) ====================
@@ -283,6 +343,7 @@ async def create_user(
         username=user_data.username,
         password_hash=password_hash,
         full_name=user_data.full_name,
+        company=user_data.company,
         is_admin=user_data.is_admin
     )
     
@@ -327,6 +388,8 @@ async def get_user(
         email=user['email'],
         username=user['username'],
         full_name=user.get('full_name'),
+        company=user.get('company'),
+        profile_image_url=user.get('profile_image_url'),
         is_active=user['is_active'],
         is_admin=user['is_admin'],
         created_at=user['created_at'],
@@ -351,6 +414,9 @@ async def update_user(
     Returns:
         Updated user
     """
+    logger.info(f"Admin {current_user.username} updating user {user_id}")
+    logger.info(f"Update data received: {user_data.model_dump(exclude_unset=True)}")
+    
     # Prevent admin from deactivating themselves
     if user_id == current_user.user_id and user_data.is_active is False:
         raise HTTPException(
@@ -358,31 +424,60 @@ async def update_user(
             detail="Cannot deactivate your own account",
         )
     
-    # Prepare update parameters
-    update_params = {
-        'email': user_data.email,
-        'username': user_data.username,
-        'full_name': user_data.full_name,
-        'is_active': user_data.is_active
-    }
+    # Prepare update parameters - only include fields that are actually set
+    update_params = {}
+    
+    if user_data.email is not None:
+        update_params['email'] = user_data.email
+    
+    if user_data.username is not None:
+        update_params['username'] = user_data.username
+    
+    if user_data.full_name is not None:
+        update_params['full_name'] = user_data.full_name
+    
+    if user_data.company is not None:
+        update_params['company'] = user_data.company
+    
+    if user_data.profile_image_url is not None:
+        update_params['profile_image_url'] = user_data.profile_image_url
+    
+    if user_data.is_active is not None:
+        update_params['is_active'] = user_data.is_active
     
     # Hash password if provided
     if user_data.password:
         logger.info(f"Password provided for user {user_id}, hashing it")
         update_params['password_hash'] = get_password_hash(user_data.password)
     else:
-        logger.info(f"No password provided for user {user_id}")
+        logger.info(f"No password provided for user {user_id}, keeping existing password")
+    
+    logger.info(f"Final update params: {list(update_params.keys())}")
     
     # Update user
     updated_user = db_service.update_user(user_id, **update_params)
     
     if not updated_user:
+        logger.error(f"Failed to update user {user_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found or update failed",
         )
     
-    logger.info(f"Admin {current_user.username} updated user: {updated_user['email']}")
+    logger.info(f"Admin {current_user.username} successfully updated user: {updated_user['email']}")
+    
+    return UserResponse(
+        id=updated_user['id'],
+        email=updated_user['email'],
+        username=updated_user['username'],
+        full_name=updated_user.get('full_name'),
+        company=updated_user.get('company'),
+        profile_image_url=updated_user.get('profile_image_url'),
+        is_active=updated_user['is_active'],
+        is_admin=updated_user['is_admin'],
+        created_at=updated_user['created_at'],
+        last_login=updated_user.get('last_login')
+    )
     
     return UserResponse(**updated_user)
 
@@ -476,6 +571,8 @@ async def get_user_usage_report(
             email=user['email'],
             username=user['username'],
             full_name=user.get('full_name'),
+            company=user.get('company'),
+            profile_image_url=user.get('profile_image_url'),
             is_active=user['is_active'],
             is_admin=user['is_admin'],
             created_at=user['created_at'],

@@ -78,8 +78,7 @@ const LLMConfigPanel: React.FC = () => {
   // Fetch available models
   const fetchModels = async () => {
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseUrl}/api/v1/llm/models`);
+      const response = await fetch('/api/v1/llm/models');
       const data = await response.json();
 
       if (data.models) {
@@ -126,8 +125,7 @@ const LLMConfigPanel: React.FC = () => {
   // Fetch usage stats
   const fetchUsage = async () => {
     try {
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      const response = await fetch(`${baseUrl}/api/v1/llm/usage`);
+      const response = await fetch('/api/v1/llm/usage');
       const data = await response.json();
 
       if (data.usage) {
@@ -142,8 +140,7 @@ const LLMConfigPanel: React.FC = () => {
   const resetStats = async () => {
     try {
       setLoading(true);
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-      await fetch(`${baseUrl}/api/v1/llm/reset-stats`, { method: 'POST' });
+      await fetch('/api/v1/llm/reset-stats', { method: 'POST' });
       await fetchUsage(); // Refresh
       setLoading(false);
     } catch (err) {

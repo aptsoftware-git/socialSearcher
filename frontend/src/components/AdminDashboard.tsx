@@ -30,6 +30,7 @@ import {
   Stack,
   InputAdornment,
   Tooltip,
+  Avatar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -48,6 +49,8 @@ interface User {
   email: string;
   username: string;
   full_name?: string;
+  company?: string;
+  profile_image_url?: string;
   is_active: boolean;
   is_admin: boolean;
   created_at: string;
@@ -113,6 +116,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
     username: '',
     password: '',
     full_name: '',
+    company: '',
     is_admin: false,
     is_active: true,
   });
@@ -124,8 +128,6 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
   const [usageReport, setUsageReport] = useState<MonthlySummary | null>(null);
   const [reportUser, setReportUser] = useState<User | null>(null);
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://tigerosint.aptsoftware.in';
-
   useEffect(() => {
     fetchUsers();
   }, []);
@@ -134,7 +136,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${baseUrl}/api/v1/users/`, {
+      const response = await fetch('/api/v1/users/', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -184,6 +186,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
       username: '',
       password: autoPassword,
       full_name: '',
+      company: '',
       is_admin: false,
       is_active: true,
     });
@@ -198,6 +201,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
       username: user.username,
       password: '', // Empty initially, only fill if resetting
       full_name: user.full_name || '',
+      company: user.company || '',
       is_admin: user.is_admin,
       is_active: user.is_active,
     });
@@ -216,6 +220,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
           email: userForm.email,
           username: userForm.username,
           full_name: userForm.full_name || null,
+          company: userForm.company || null,
           is_active: userForm.is_active,
         };
         
@@ -233,7 +238,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
         
         console.log('Update data:', updateData);
         
-        const response = await fetch(`${baseUrl}/api/v1/users/${editingUser.id}`, {
+        const response = await fetch(`/api/v1/users/${editingUser.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -250,7 +255,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
         setSuccess('User updated successfully');
       } else {
         // Create new user
-        const response = await fetch(`${baseUrl}/api/v1/users/`, {
+        const response = await fetch('/api/v1/users/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -279,7 +284,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
   const handleToggleUserStatus = async (user: User) => {
     try {
       setLoading(true);
-      const response = await fetch(`${baseUrl}/api/v1/users/${user.id}`, {
+      const response = await fetch(`/api/v1/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -313,7 +318,7 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
       setLoading(true);
       setError('');
       
-      const response = await fetch(`${baseUrl}/api/v1/users/usage-report`, {
+      const response = await fetch('/api/v1/users/usage-report', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,9 +405,11 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
             <Table>
               <TableHead>
                 <TableRow>
+                  <TableCell>Profile</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Username</TableCell>
                   <TableCell>Full Name</TableCell>
+                  <TableCell>Company</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Last Login</TableCell>
@@ -412,9 +419,19 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <Avatar
+                        src={user.profile_image_url}
+                        alt={user.full_name || user.username}
+                        sx={{ width: 40, height: 40 }}
+                      >
+                        {!user.profile_image_url && (user.full_name?.[0] || user.username[0]).toUpperCase()}
+                      </Avatar>
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.username}</TableCell>
                     <TableCell>{user.full_name || '-'}</TableCell>
+                    <TableCell>{user.company || '-'}</TableCell>
                     <TableCell>
                       <Chip
                         label={user.is_admin ? 'Admin' : 'User'}
@@ -719,6 +736,14 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
               label="Full Name"
               value={userForm.full_name}
               onChange={(e) => setUserForm({ ...userForm, full_name: e.target.value })}
+              margin="normal"
+            />
+
+            <TextField
+              fullWidth
+              label="Company"
+              value={userForm.company}
+              onChange={(e) => setUserForm({ ...userForm, company: e.target.value })}
               margin="normal"
             />
 

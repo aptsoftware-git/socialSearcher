@@ -491,6 +491,8 @@ class UserResponse(BaseModel):
     email: str
     username: str
     full_name: Optional[str] = None
+    company: Optional[str] = None
+    profile_image_url: Optional[str] = None
     is_active: bool
     is_admin: bool
     created_at: datetime
@@ -517,6 +519,7 @@ class CreateUserRequest(BaseModel):
     username: str
     password: str
     full_name: Optional[str] = None
+    company: Optional[str] = None
     is_admin: bool = False
 
 
@@ -525,6 +528,8 @@ class UpdateUserRequest(BaseModel):
     email: Optional[str] = None
     username: Optional[str] = None
     full_name: Optional[str] = None
+    company: Optional[str] = None
+    profile_image_url: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None  # Optional password for admin reset
 
