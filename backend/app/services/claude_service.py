@@ -20,11 +20,6 @@ class ClaudeUsageStats:
     
     # Pricing per 1M tokens (as of Dec 2024)
     PRICING = {
-        "claude-3-5-haiku-20241022": {
-            "input": 0.80,
-            "input_cached": 0.08,
-            "output": 4.00
-        },
         "claude-3-haiku-20240307": {
             "input": 0.25,
             "input_cached": 0.025,
@@ -71,7 +66,7 @@ class ClaudeUsageStats:
         Returns:
             Dictionary with cost breakdown
         """
-        pricing = self.PRICING.get(model, self.PRICING["claude-3-5-haiku-20241022"])
+        pricing = self.PRICING.get(model, self.PRICING["claude-3-haiku-20240307"])
         
         # Extract tokens
         input_tokens = usage.input_tokens or 0
@@ -142,14 +137,12 @@ class ClaudeService:
     # Available models - using full model names directly
     MODELS = {
         # Full model names (used directly)
-        "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022",
         "claude-3-haiku-20240307": "claude-3-haiku-20240307",
         "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022",
         "claude-3-5-sonnet-20240620": "claude-3-5-sonnet-20240620",
         "claude-3-opus-20240229": "claude-3-opus-20240229",
         "claude-3-sonnet-20240229": "claude-3-sonnet-20240229",
         # Short name aliases for backward compatibility
-        "claude-3.5-haiku": "claude-3-5-haiku-20241022",
         "claude-3-haiku": "claude-3-haiku-20240307",
         "claude-3.5-sonnet": "claude-3-5-sonnet-20241022",
         "claude-3-opus": "claude-3-opus-20240229",
@@ -159,7 +152,7 @@ class ClaudeService:
     def __init__(
         self,
         api_key: Optional[str] = None,
-        default_model: str = "claude-3-5-haiku-20241022",  # Use full model name
+        default_model: str = "claude-3-haiku-20240307",  # Use full model name
         max_retries: int = 3,
         timeout: int = 60
     ):
@@ -168,13 +161,13 @@ class ClaudeService:
         
         Args:
             api_key: Anthropic API key (defaults to settings)
-            default_model: Default model to use (short name like 'claude-3.5-haiku')
+            default_model: Default model to use (full model name like 'claude-3-haiku-20240307')
             max_retries: Maximum retry attempts
             timeout: Request timeout in seconds
         """
         self.api_key = api_key or settings.claude_api_key
         # Store default model, fallback to fastest model if invalid
-        self.default_model = default_model if default_model in self.MODELS else "claude-3-5-haiku-20241022"
+        self.default_model = default_model if default_model in self.MODELS else "claude-3-haiku-20240307"
         self.max_retries = max_retries
         self.timeout = timeout
         
@@ -345,16 +338,9 @@ class ClaudeService:
         # Return models in the same format as old implementation
         return [
             {
-                "id": "claude-3-5-haiku-20241022",
-                "name": "Claude 3.5 Haiku (Fastest)",
-                "description": "Fastest and most cost-effective",
-                "speed": "fastest",
-                "cost": "lowest"
-            },
-            {
                 "id": "claude-3-haiku-20240307",
-                "name": "Claude 3 Haiku",
-                "description": "Fast and affordable",
+                "name": "Claude 3 Haiku (Fastest)",
+                "description": "Fast and affordable - Most cost-effective",
                 "speed": "fastest",
                 "cost": "lowest"
             },

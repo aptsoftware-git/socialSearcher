@@ -44,13 +44,13 @@ class Settings(BaseSettings):
     
     # Claude API
     claude_api_key: str = ""  # Set via CLAUDE_API_KEY in .env
-    default_claude_model: str = "claude-3-5-haiku-20241022"  # Claude 3.5 Haiku - Fast and cost-effective
+    default_claude_model: str = "claude-3-haiku-20240307"  # Claude 3 Haiku - Fast and cost-effective
     claude_max_concurrent: int = 5  # Max concurrent Claude API requests
     claude_timeout: int = 30  # Claude API timeout in seconds
     
     # LLM Provider Selection
     default_llm_provider: str = "claude"  # "claude" or "ollama" - Changed to Claude as primary
-    enable_llm_fallback: bool = True  # Fallback to alternate provider on failure (Claude → Ollama)
+    enable_llm_fallback: bool = False  # Fallback to alternate provider on failure (Claude → Ollama)
     
     # Scraping Limits (Global defaults - can be overridden per source)
     max_search_results: int = 10  # Maximum URL results to extract from search page

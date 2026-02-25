@@ -618,7 +618,7 @@ async def analyse_social_content(
         POST /api/v1/social-content/analyse
         {
             "content": {...full social content object...},
-            "llm_model": "claude-3-5-haiku-20241022"
+            "llm_model": "claude-3-haiku-20240307"
         }
         ```
     """
@@ -706,7 +706,7 @@ async def analyse_social_content(
         processing_time = (end_time - start_time).total_seconds()
         
         # Get the model that was actually used from metadata
-        # Format: "provider:model" (e.g., "ollama:qwen2.5:latest" or "claude:claude-3-5-haiku-20241022")
+        # Format: "provider:model" (e.g., "ollama:qwen2.5:latest" or "claude:claude-3-haiku-20240307")
         llm_model_used = metadata.get("model", model_to_use or "default")
         provider = metadata.get("provider", "unknown")
         if provider != "unknown":
@@ -1406,7 +1406,7 @@ async def export_social_events(
                 }
             ],
             "platform_filter": "youtube",
-            "llm_model": "claude-3-5-haiku-20241022"
+            "llm_model": "claude-3-haiku-20240307"
         }
         ```
     """

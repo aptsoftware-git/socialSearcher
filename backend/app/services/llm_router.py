@@ -26,9 +26,9 @@ class LLMRouter:
     
     def __init__(self):
         """Initialize LLM router."""
-        self.default_provider = settings.default_llm_provider or "ollama"
-        self.default_claude_model = settings.default_claude_model or "claude-3-5-haiku-20241022"
-        self.enable_fallback = settings.enable_llm_fallback if hasattr(settings, 'enable_llm_fallback') else True
+        self.default_provider = settings.default_llm_provider or "claude"
+        self.default_claude_model = settings.default_claude_model or "claude-3-haiku-20240307"
+        self.enable_fallback = settings.enable_llm_fallback if hasattr(settings, 'enable_llm_fallback') else False
         
         # Initialize Ollama client on-demand
         self._ollama_client = None
@@ -301,7 +301,7 @@ class LLMRouter:
                 "models": [{"id": ollama_default, "name": ollama_default}]
             },
             "claude": {
-                "default": "claude-3-5-haiku-20241022",
+                "default": "claude-3-haiku-20240307",
                 "models": claude_service.list_models()
             }
         }
