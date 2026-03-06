@@ -712,6 +712,11 @@ pip install -r requirements.txt
 See [Backend README](backend/README.md) for more troubleshooting tips.
 
 ---
+## Development commands:
+docker-compose build frontend
+docker-compose up -d frontend && docker-compose restart nginx
+
+docker-compose restart backend
 
 ## 📅 Development Timeline
 

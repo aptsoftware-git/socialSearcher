@@ -12,6 +12,8 @@ import {
   CircularProgress,
   IconButton,
   InputAdornment,
+  AppBar,
+  Toolbar,
 } from '@mui/material';
 import { 
   Lock as LockIcon,
@@ -19,6 +21,7 @@ import {
   VisibilityOff,
 } from '@mui/icons-material';
 import logoImage from '../assets/defenderosint.webp';
+import makeInIndiaLogo from '../assets/Make_In_India.png';
 
 interface LoginProps {
   onLoginSuccess: (user: any, token: string) => void;
@@ -70,128 +73,167 @@ const Login = ({ onLoginSuccess }: LoginProps) => {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Paper
-          elevation={3}
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* App Bar / Header */}
+      <AppBar position="static">
+        <Toolbar>
+          <Box
+            component="img"
+            src={logoImage}
+            alt="Logo"
+            sx={{ height: 52, mr: 2 }}
+          />
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            <Box component="span" sx={{ fontWeight: 'bold' }}>Tiger OSINT</Box> - AI based customized web scrapper
+          </Typography>
+        </Toolbar>
+      </AppBar>
+
+      {/* Main Content - Login Form */}
+      <Container maxWidth="sm" sx={{ flex: 1, display: 'flex', alignItems: 'center', py: 3 }}>
+        <Box
           sx={{
-            p: 4,
             width: '100%',
-            maxWidth: 400,
           }}
         >
-          {/* Logo */}
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <img
-              src={logoImage}
-              alt="Defender OSINT"
-              style={{ width: '40%', marginBottom: '16px' }}
-            />
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
-              <LockIcon color="primary" fontSize="small" />
-              <Typography variant="h5" component="h1">
-                Sign In
+          <Paper
+            elevation={3}
+            sx={{
+              p: 3,
+              width: '100%',
+              maxWidth: 400,
+            }}
+          >
+            {/* Logo */}
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <img
+                src={logoImage}
+                alt="Defender OSINT"
+                style={{ width: '35%', marginBottom: '12px' }}
+              />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                <LockIcon color="primary" fontSize="small" />
+                <Typography variant="h5" component="h1">
+                  Sign In
+                </Typography>
+              </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Enter your credentials to access the system
               </Typography>
             </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Enter your credentials to access the system
+
+            {/* Error Alert */}
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            {/* Login Form */}
+            <form onSubmit={handleSubmit}>
+              <TextField
+                fullWidth
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                margin="normal"
+                required
+                autoComplete="email"
+                autoFocus
+                disabled={loading}
+              />
+
+              <TextField
+                fullWidth
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                margin="normal"
+                required
+                autoComplete="current-password"
+                disabled={loading}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="toggle password visibility"
+                        onClick={() => setShowPassword(!showPassword)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        edge="end"
+                        disabled={loading}
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    disabled={loading}
+                  />
+                }
+                label="Remember me"
+                sx={{ mt: 1 }}
+              />
+
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                size="large"
+                disabled={loading}
+                sx={{ mt: 2, mb: 1.5 }}
+              >
+                {loading ? (
+                  <>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </form>
+
+            {/* Footer */}
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 1.5 }}>
+              Contact your administrator if you don't have access
             </Typography>
-          </Box>
+          </Paper>
+        </Box>
+      </Container>
 
-          {/* Error Alert */}
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          {/* Login Form */}
-          <form onSubmit={handleSubmit}>
-            <TextField
-              fullWidth
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              margin="normal"
-              required
-              autoComplete="email"
-              autoFocus
-              disabled={loading}
-            />
-
-            <TextField
-              fullWidth
-              label="Password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              margin="normal"
-              required
-              autoComplete="current-password"
-              disabled={loading}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      aria-label="toggle password visibility"
-                      onClick={() => setShowPassword(!showPassword)}
-                      onMouseDown={(e) => e.preventDefault()}
-                      edge="end"
-                      disabled={loading}
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
+      {/* Footer */}
+      <Box component="footer" sx={{ py: 1.5, px: 1.5, mt: 'auto', backgroundColor: (theme) => theme.palette.grey[200] }}>
+        <Container maxWidth="xl">
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            {/* Make in India Logo - Absolute Left */}
+            <Box
+              component="img"
+              src={makeInIndiaLogo}
+              alt="Make in India"
+              sx={{ 
+                height: 32,
+                position: 'absolute',
+                left: 0
               }}
             />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  disabled={loading}
-                />
-              }
-              label="Remember me"
-              sx={{ mt: 1 }}
-            />
-
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{ mt: 3, mb: 2 }}
-            >
-              {loading ? (
-                <>
-                  <CircularProgress size={20} sx={{ mr: 1 }} />
-                  Signing in...
-                </>
-              ) : (
-                'Sign In'
-              )}
-            </Button>
-          </form>
-
-          {/* Footer */}
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', mt: 2 }}>
-            Contact your administrator if you don't have access
-          </Typography>
-        </Paper>
+            
+            {/* Developer Info - Centered */}
+            <Typography variant="caption" color="text.secondary" align="center">
+              Developed by Apt Software Avenues Pvt. Ltd. (a Defender Framework tool)
+            </Typography>
+          </Box>
+        </Container>
       </Box>
-    </Container>
+    </Box>
   );
 };
 
