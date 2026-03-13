@@ -225,7 +225,7 @@ const LLMConfigDropdown: React.FC = () => {
                     <MenuItem key="claude-3-5-haiku-20241022" value="claude-3-5-haiku-20241022">
                       Claude 3.5 Haiku (Fastest)
                     </MenuItem>,
-                    <MenuItem key="claude-3-haiku-20240307" value="claude-3-haiku-20240307">
+                    <MenuItem key="claude-haiku-4-5-20251001" value="claude-haiku-4-5-20251001">
                       Claude 3 Haiku
                     </MenuItem>,
                     <MenuItem key="claude-3-5-sonnet-20241022" value="claude-3-5-sonnet-20241022">

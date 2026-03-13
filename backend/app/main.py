@@ -618,7 +618,7 @@ async def analyse_social_content(
         POST /api/v1/social-content/analyse
         {
             "content": {...full social content object...},
-            "llm_model": "claude-3-haiku-20240307"
+            "llm_model": "claude-haiku-4-5-20251001"
         }
         ```
     """
@@ -1406,7 +1406,7 @@ async def export_social_events(
                 }
             ],
             "platform_filter": "youtube",
-            "llm_model": "claude-3-haiku-20240307"
+            "llm_model": "claude-haiku-4-5-20251001"
         }
         ```
     """

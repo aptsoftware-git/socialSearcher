@@ -200,7 +200,7 @@ const LLMConfigPanel: React.FC = () => {
             LLM Configuration
           </Typography>
           <Chip
-            label={config.provider === 'claude' ? 'Cloude (Claude)' : 'Local (Ollama)'}
+            label={config.provider === 'claude' ? 'Cloud (Claude)' : 'Local (Ollama)'}
             size="small"
             color={config.provider === 'claude' ? 'primary' : 'default'}
           />
@@ -250,7 +250,7 @@ const LLMConfigPanel: React.FC = () => {
                           <MenuItem key="claude-3-5-haiku-20241022" value="claude-3-5-haiku-20241022">
                             Claude 3.5 Haiku (Fastest)
                           </MenuItem>,
-                          <MenuItem key="claude-3-haiku-20240307" value="claude-3-haiku-20240307">
+                          <MenuItem key="claude-haiku-4-5-20251001" value="claude-haiku-4-5-20251001">
                             Claude 3 Haiku
                           </MenuItem>,
                           <MenuItem key="claude-3-5-sonnet-20241022" value="claude-3-5-sonnet-20241022">

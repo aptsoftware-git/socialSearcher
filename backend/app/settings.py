@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     
     # Claude API
     claude_api_key: str = ""  # Set via CLAUDE_API_KEY in .env
-    default_claude_model: str = "claude-3-haiku-20240307"  # Claude 3 Haiku - Fast and cost-effective
+    default_claude_model: str = "claude-haiku-4-5-20251001"  # Claude 3 Haiku - Fast and cost-effective
     claude_max_concurrent: int = 5  # Max concurrent Claude API requests
     claude_timeout: int = 30  # Claude API timeout in seconds
     
