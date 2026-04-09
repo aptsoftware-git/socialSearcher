@@ -735,6 +735,10 @@ cd /home/ubuntu/socialSearcher
 # Rebuild and restart only the backend container
 docker-compose build backend
 docker-compose up -d backend
+
+or 
+
+docker-compose up -d --build backend
 ```
 
 ### Restart Frontend
