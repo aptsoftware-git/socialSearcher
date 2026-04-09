@@ -57,7 +57,7 @@ const LLMConfigDropdown: React.FC = () => {
         console.error('Failed to parse saved LLM config:', e);
       }
     }
-    return { provider: 'claude', model: 'claude-3-5-haiku-20241022' };
+    return { provider: 'claude', model: 'claude-sonnet-4-6' };
   });
 
   const [models, setModels] = useState<{ claude: LLMModel[] }>({
@@ -84,7 +84,7 @@ const LLMConfigDropdown: React.FC = () => {
           claude: claudeModels,
         });
 
-        const defaultModel = data.models.claude?.default || 'claude-3-5-haiku-20241022';
+        const defaultModel = data.models.claude?.default || 'claude-sonnet-4-6';
 
         setConfig(prev => {
           const modelExists = claudeModels.some((m: LLMModel) => m.id === prev.model);
@@ -222,23 +222,11 @@ const LLMConfigDropdown: React.FC = () => {
                     </MenuItem>
                   ))
                 : [
-                    <MenuItem key="claude-3-5-haiku-20241022" value="claude-3-5-haiku-20241022">
-                      Claude 3.5 Haiku (Fastest)
+                    <MenuItem key="claude-sonnet-4-6" value="claude-sonnet-4-6">
+                      Claude Sonnet 4.6 (Default)
                     </MenuItem>,
-                    <MenuItem key="claude-haiku-4-5-20251001" value="claude-haiku-4-5-20251001">
-                      Claude 3 Haiku
-                    </MenuItem>,
-                    <MenuItem key="claude-3-5-sonnet-20241022" value="claude-3-5-sonnet-20241022">
-                      Claude 3.5 Sonnet (Latest)
-                    </MenuItem>,
-                    <MenuItem key="claude-3-5-sonnet-20240620" value="claude-3-5-sonnet-20240620">
-                      Claude 3.5 Sonnet
-                    </MenuItem>,
-                    <MenuItem key="claude-3-opus-20240229" value="claude-3-opus-20240229">
-                      Claude 3 Opus (Best Quality)
-                    </MenuItem>,
-                    <MenuItem key="claude-3-sonnet-20240229" value="claude-3-sonnet-20240229">
-                      Claude 3 Sonnet
+                    <MenuItem key="claude-opus-4-6" value="claude-opus-4-6">
+                      Claude Opus 4.6 (Best Quality)
                     </MenuItem>
                   ]
               }

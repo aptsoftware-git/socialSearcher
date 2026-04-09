@@ -301,7 +301,7 @@ class LLMRouter:
                 "models": [{"id": ollama_default, "name": ollama_default}]
             },
             "claude": {
-                "default": "claude-3-5-haiku-20241022",
+                "default": "claude-sonnet-4-6",
                 "models": claude_service.list_models()
             }
         }

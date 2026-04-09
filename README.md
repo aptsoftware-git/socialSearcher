@@ -718,6 +718,48 @@ docker-compose up -d frontend && docker-compose restart nginx
 
 docker-compose restart backend
 
+---
+
+## ☁️ AWS Environment — Restart Instructions
+
+Use the following commands when deploying or restarting services on the AWS EC2 instance.
+
+### Connect to the instance
+```bash
+ssh -i your-key.pem ubuntu@<EC2_PUBLIC_IP>
+cd /home/ubuntu/socialSearcher
+```
+
+### Restart Backend
+```bash
+# Rebuild and restart only the backend container
+docker-compose build backend
+docker-compose up -d backend
+```
+
+### Restart Frontend
+```bash
+# Rebuild and restart the frontend container, then reload nginx
+docker-compose build frontend
+docker-compose up -d frontend && docker-compose restart nginx
+```
+
+### Restart All Services
+```bash
+# Full restart of all containers
+docker-compose down
+docker-compose up -d
+```
+
+### Check Service Status
+```bash
+docker-compose ps
+docker-compose logs -f backend
+docker-compose logs -f frontend
+```
+
+---
+
 ## 📅 Development Timeline
 
 - **Week 1-2:** ✅ Setup, Configuration, Scraping

@@ -172,12 +172,12 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query,
       const saved = localStorage.getItem('llm_config');
       if (saved) {
         const config = JSON.parse(saved);
-        return config.model || 'claude-3-5-haiku-20241022';
+        return config.model || 'claude-sonnet-4-6';
       }
     } catch (e) {
       console.error('Failed to read LLM config:', e);
     }
-    return 'claude-3-5-haiku-20241022'; // Default
+    return 'claude-sonnet-4-6'; // Default
   };
 
   // Function to check cache status for all results
@@ -1283,12 +1283,12 @@ const SocialResultsPanel: React.FC<SocialResultsPanelProps> = ({ results, query,
             const saved = localStorage.getItem('llm_config');
             if (saved) {
               const config = JSON.parse(saved);
-              return config.model || 'claude-3-5-haiku-20241022';
+              return config.model || 'claude-sonnet-4-6';
             }
           } catch (e) {
             console.error('Failed to read LLM config:', e);
           }
-          return 'claude-3-5-haiku-20241022'; // Default
+          return 'claude-sonnet-4-6'; // Default
         })()}
       />
     </Box>

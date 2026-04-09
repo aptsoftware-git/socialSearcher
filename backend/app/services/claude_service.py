@@ -18,37 +18,17 @@ from app.settings import settings
 class ClaudeUsageStats:
     """Track Claude API usage and costs."""
     
-    # Pricing per 1M tokens (as of Dec 2024)
+    # Pricing per 1M tokens
     PRICING = {
-        "claude-3-5-haiku-20241022": {
-            "input": 0.80,
-            "input_cached": 0.08,
-            "output": 4.00
-        },
-        "claude-haiku-4-5-20251001": {
-            "input": 0.25,
-            "input_cached": 0.025,
-            "output": 1.25
-        },
-        "claude-3-5-sonnet-20241022": {
+        "claude-sonnet-4-6": {
             "input": 3.00,
             "input_cached": 0.30,
             "output": 15.00
         },
-        "claude-3-5-sonnet-20240620": {
-            "input": 3.00,
-            "input_cached": 0.30,
-            "output": 15.00
-        },
-        "claude-3-opus-20240229": {
+        "claude-opus-4-6": {
             "input": 15.00,
             "input_cached": 1.50,
             "output": 75.00
-        },
-        "claude-3-sonnet-20240229": {
-            "input": 3.00,
-            "input_cached": 0.30,
-            "output": 15.00
         }
     }
     
@@ -71,7 +51,7 @@ class ClaudeUsageStats:
         Returns:
             Dictionary with cost breakdown
         """
-        pricing = self.PRICING.get(model, self.PRICING["claude-haiku-4-5-20251001"])
+        pricing = self.PRICING.get(model, self.PRICING["claude-sonnet-4-6"])
         
         # Extract tokens
         input_tokens = usage.input_tokens or 0
@@ -139,26 +119,16 @@ class ClaudeService:
     - Async operation with queue management
     """
     
-    # Available models - using full model names directly
+    # Available models
     MODELS = {
-        # Full model names (used directly)
-        "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022",
-        "claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
-        "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022",
-        "claude-3-5-sonnet-20240620": "claude-3-5-sonnet-20240620",
-        "claude-3-opus-20240229": "claude-3-opus-20240229",
-        "claude-3-sonnet-20240229": "claude-3-sonnet-20240229",
-        # Short name aliases for backward compatibility
-        "claude-3.5-haiku": "claude-3-5-haiku-20241022",
-        "claude-3.5-sonnet": "claude-3-5-sonnet-20241022",
-        "claude-3-opus": "claude-3-opus-20240229",
-        "claude-3-sonnet": "claude-3-sonnet-20240229"
+        "claude-sonnet-4-6": "claude-sonnet-4-6",
+        "claude-opus-4-6": "claude-opus-4-6"
     }
     
     def __init__(
         self,
         api_key: Optional[str] = None,
-        default_model: str = "claude-3-5-haiku-20241022",  # Use full model name
+        default_model: str = "claude-sonnet-4-6",
         max_retries: int = 3,
         timeout: int = 60
     ):
@@ -173,7 +143,7 @@ class ClaudeService:
         """
         self.api_key = api_key or settings.claude_api_key
         # Store default model, fallback to fastest model if invalid
-        self.default_model = default_model if default_model in self.MODELS else "claude-3-5-haiku-20241022"
+        self.default_model = default_model if default_model in self.MODELS else "claude-sonnet-4-6"
         self.max_retries = max_retries
         self.timeout = timeout
         
@@ -341,49 +311,20 @@ class ClaudeService:
         Returns:
             List of model info dictionaries
         """
-        # Return models in the same format as old implementation
         return [
             {
-                "id": "claude-3-5-haiku-20241022",
-                "name": "Claude 3.5 Haiku (Fastest)",
-                "description": "Latest fast model - Very cost-effective",
-                "speed": "fastest",
-                "cost": "lowest"
-            },
-            {
-                "id": "claude-haiku-4-5-20251001",
-                "name": "Claude 4.5 Haiku",
-                "description": "Original fast model - Most affordable",
-                "speed": "fastest",
-                "cost": "lowest"
-            },
-            {
-                "id": "claude-3-5-sonnet-20241022",
-                "name": "Claude 3.5 Sonnet (Latest)",
-                "description": "Latest balanced model",
+                "id": "claude-sonnet-4-6",
+                "name": "Claude Sonnet 4.6",
+                "description": "Balanced quality and speed - Default",
                 "speed": "medium",
                 "cost": "medium"
             },
             {
-                "id": "claude-3-5-sonnet-20240620",
-                "name": "Claude 3.5 Sonnet",
-                "description": "Balanced quality and speed",
-                "speed": "medium",
-                "cost": "medium"
-            },
-            {
-                "id": "claude-3-opus-20240229",
-                "name": "Claude 3 Opus (Best Quality)",
-                "description": "Highest quality, most expensive",
+                "id": "claude-opus-4-6",
+                "name": "Claude Opus 4.6",
+                "description": "Highest quality, most capable",
                 "speed": "slower",
                 "cost": "highest"
-            },
-            {
-                "id": "claude-3-sonnet-20240229",
-                "name": "Claude 3 Sonnet",
-                "description": "Balanced model",
-                "speed": "medium",
-                "cost": "medium"
             }
         ]
 
