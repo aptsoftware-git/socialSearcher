@@ -144,3 +144,8 @@ COMMENT ON TABLE users IS 'User accounts and authentication';
 COMMENT ON TABLE user_api_usage IS 'Track API usage and costs per user';
 COMMENT ON TABLE user_api_keys IS 'Encrypted storage for user API keys';
 COMMENT ON TABLE search_history IS 'User search query history';
+
+-- ===== Search quota columns (migration) =====
+ALTER TABLE users ADD COLUMN IF NOT EXISTS search_limit INTEGER DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_start_date DATE DEFAULT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS quota_end_date DATE DEFAULT NULL;

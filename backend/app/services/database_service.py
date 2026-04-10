@@ -58,7 +58,8 @@ class DatabaseService:
                 cur.execute(
                     """
                     SELECT id, email, username, password_hash, full_name, company, profile_image_url,
-                           is_active, is_admin, created_at, updated_at, last_login
+                           is_active, is_admin, created_at, updated_at, last_login,
+                           search_limit, quota_start_date, quota_end_date
                     FROM users 
                     WHERE email = %s
                     """,
@@ -81,7 +82,8 @@ class DatabaseService:
                 cur.execute(
                     """
                     SELECT id, email, username, password_hash, full_name, company, profile_image_url,
-                           is_active, is_admin, created_at, updated_at, last_login
+                           is_active, is_admin, created_at, updated_at, last_login,
+                           search_limit, quota_start_date, quota_end_date
                     FROM users 
                     WHERE id = %s
                     """,
@@ -104,7 +106,8 @@ class DatabaseService:
                 cur.execute(
                     """
                     SELECT id, email, username, full_name, company, profile_image_url,
-                           is_active, is_admin, created_at, last_login
+                           is_active, is_admin, created_at, last_login,
+                           search_limit, quota_start_date, quota_end_date
                     FROM users 
                     ORDER BY created_at DESC
                     """
@@ -154,7 +157,9 @@ class DatabaseService:
         conn = None
         try:
             # Build dynamic update query
-            allowed_fields = ['email', 'username', 'password_hash', 'full_name', 'company', 'profile_image_url', 'is_active']
+            allowed_fields = ['email', 'username', 'password_hash', 'full_name', 'company',
+                              'profile_image_url', 'is_active', 'search_limit',
+                              'quota_start_date', 'quota_end_date']
             update_fields = []
             values = []
             
@@ -162,6 +167,12 @@ class DatabaseService:
                 if field in allowed_fields and value is not None:
                     update_fields.append(f"{field} = %s")
                     values.append(value)
+
+            # Handle explicit NULL clears (e.g., removing quota)
+            null_fields = kwargs.get('_null_fields', [])
+            for field in null_fields:
+                if field in allowed_fields:
+                    update_fields.append(f"{field} = NULL")
             
             if not update_fields:
                 return None
@@ -175,7 +186,8 @@ class DatabaseService:
                     UPDATE users 
                     SET {', '.join(update_fields)}
                     WHERE id = %s
-                    RETURNING id, email, username, full_name, company, profile_image_url, is_active, is_admin, created_at, updated_at
+                    RETURNING id, email, username, full_name, company, profile_image_url, is_active, is_admin,
+                              created_at, updated_at, search_limit, quota_start_date, quota_end_date
                     """,
                     values
                 )
@@ -361,6 +373,176 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error getting user total cost: {e}")
             return 0.0
+        finally:
+            if conn:
+                self.return_connection(conn)
+
+    def log_search_history(self, user_id: int, query: str, search_type: str = 'social') -> bool:
+        """Log a search request to search_history (one row per search = quota unit)."""
+        conn = None
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO search_history (user_id, query, search_type) VALUES (%s, %s, %s)",
+                    (user_id, query, search_type)
+                )
+                conn.commit()
+                return True
+        except Exception as e:
+            logger.error(f"Error logging search history: {e}")
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                self.return_connection(conn)
+
+    def get_user_quota_status(self, user_id: int) -> Dict[str, Any]:
+        """Get current quota status for a user."""
+        conn = None
+        try:
+            conn = self.get_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get quota settings
+                cur.execute(
+                    "SELECT search_limit, quota_start_date, quota_end_date FROM users WHERE id = %s",
+                    (user_id,)
+                )
+                user = cur.fetchone()
+                if not user:
+                    return {'has_limit': False, 'searches_used': 0, 'search_limit': None,
+                            'quota_start_date': None, 'quota_end_date': None,
+                            'total_scrapings': 0, 'total_analyses': 0,
+                            'percentage': 0.0, 'period_label': '', 'daily_breakdown': []}
+
+                search_limit = user['search_limit']
+                start_date = user['quota_start_date']
+                end_date = user['quota_end_date']
+
+                # Count searches from user_api_usage (sum of per-platform rows) in quota period
+                if start_date and end_date:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) as searches_used
+                        FROM user_api_usage
+                        WHERE user_id = %s
+                          AND api_type = 'search'
+                          AND platform IN ('youtube', 'twitter', 'facebook', 'instagram', 'google')
+                          AND request_timestamp::date >= %s AND request_timestamp::date <= %s
+                        """,
+                        (user_id, start_date, end_date)
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT COUNT(*) as searches_used
+                        FROM user_api_usage
+                        WHERE user_id = %s
+                          AND api_type = 'search'
+                          AND platform IN ('youtube', 'twitter', 'facebook', 'instagram', 'google')
+                        """,
+                        (user_id,)
+                    )
+                searches_used = cur.fetchone()['searches_used']
+
+                # Count scrapings and analyses in quota period
+                if start_date and end_date:
+                    cur.execute(
+                        """
+                        SELECT
+                            COUNT(CASE WHEN api_type = 'scraping' THEN 1 END) as total_scrapings,
+                            COUNT(CASE WHEN api_type = 'analysis' THEN 1 END) as total_analyses
+                        FROM user_api_usage
+                        WHERE user_id = %s AND request_timestamp::date >= %s AND request_timestamp::date <= %s
+                        """,
+                        (user_id, start_date, end_date)
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT
+                            COUNT(CASE WHEN api_type = 'scraping' THEN 1 END) as total_scrapings,
+                            COUNT(CASE WHEN api_type = 'analysis' THEN 1 END) as total_analyses
+                        FROM user_api_usage WHERE user_id = %s
+                        """,
+                        (user_id,)
+                    )
+                totals = cur.fetchone()
+
+                # Daily breakdown in quota period (no cost)
+                if start_date and end_date:
+                    cur.execute(
+                        """
+                        SELECT
+                            DATE(request_timestamp) as usage_date,
+                            COUNT(DISTINCT CASE WHEN api_type = 'search' THEN id END) as total_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'youtube' THEN 1 END) as youtube_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'twitter' THEN 1 END) as twitter_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'facebook' THEN 1 END) as facebook_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'instagram' THEN 1 END) as instagram_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'google' THEN 1 END) as google_searches,
+                            COUNT(CASE WHEN api_type = 'scraping' THEN 1 END) as total_scrapings,
+                            COUNT(CASE WHEN api_type = 'scraping' AND api_provider IN ('scrapecreators', 'google_cse') THEN 1 END) as paid_scrapings,
+                            COUNT(CASE WHEN api_type = 'scraping' AND api_provider = 'internal' THEN 1 END) as free_scrapings,
+                            COUNT(CASE WHEN api_type = 'analysis' THEN 1 END) as total_analyses
+                        FROM user_api_usage
+                        WHERE user_id = %s AND request_timestamp::date >= %s AND request_timestamp::date <= %s
+                        GROUP BY DATE(request_timestamp)
+                        ORDER BY DATE(request_timestamp)
+                        """,
+                        (user_id, start_date, end_date)
+                    )
+                else:
+                    cur.execute(
+                        """
+                        SELECT
+                            DATE(request_timestamp) as usage_date,
+                            COUNT(DISTINCT CASE WHEN api_type = 'search' THEN id END) as total_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'youtube' THEN 1 END) as youtube_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'twitter' THEN 1 END) as twitter_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'facebook' THEN 1 END) as facebook_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'instagram' THEN 1 END) as instagram_searches,
+                            COUNT(CASE WHEN api_type = 'search' AND platform = 'google' THEN 1 END) as google_searches,
+                            COUNT(CASE WHEN api_type = 'scraping' THEN 1 END) as total_scrapings,
+                            COUNT(CASE WHEN api_type = 'scraping' AND api_provider IN ('scrapecreators', 'google_cse') THEN 1 END) as paid_scrapings,
+                            COUNT(CASE WHEN api_type = 'scraping' AND api_provider = 'internal' THEN 1 END) as free_scrapings,
+                            COUNT(CASE WHEN api_type = 'analysis' THEN 1 END) as total_analyses
+                        FROM user_api_usage
+                        WHERE user_id = %s
+                        GROUP BY DATE(request_timestamp)
+                        ORDER BY DATE(request_timestamp)
+                        """,
+                        (user_id,)
+                    )
+                daily = [dict(row) for row in cur.fetchall()]
+
+                percentage = 0.0
+                if search_limit and search_limit > 0:
+                    percentage = min(100.0, round(searches_used / search_limit * 100, 1))
+
+                period_label = ''
+                if start_date and end_date:
+                    period_label = f"{start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}"
+
+                return {
+                    'has_limit': search_limit is not None,
+                    'search_limit': search_limit,
+                    'quota_start_date': start_date,
+                    'quota_end_date': end_date,
+                    'searches_used': int(searches_used),
+                    'total_scrapings': int(totals['total_scrapings']),
+                    'total_analyses': int(totals['total_analyses']),
+                    'percentage': percentage,
+                    'period_label': period_label,
+                    'daily_breakdown': daily,
+                }
+        except Exception as e:
+            logger.error(f"Error getting quota status: {e}")
+            return {'has_limit': False, 'searches_used': 0, 'search_limit': None,
+                    'quota_start_date': None, 'quota_end_date': None,
+                    'total_scrapings': 0, 'total_analyses': 0,
+                    'percentage': 0.0, 'period_label': '', 'daily_breakdown': []}
         finally:
             if conn:
                 self.return_connection(conn)

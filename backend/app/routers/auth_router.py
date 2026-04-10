@@ -11,7 +11,8 @@ from loguru import logger
 from app.models import (
     LoginRequest, LoginResponse, UserResponse, CreateUserRequest,
     UpdateUserRequest, ChangePasswordRequest, UserUsageReportRequest,
-    UserUsageReportResponse, UsageMonthlySummary, UsageDailyBreakdown
+    UserUsageReportResponse, UsageMonthlySummary, UsageDailyBreakdown,
+    QuotaStatusResponse, QuotaDailyBreakdown
 )
 from app.auth import (
     get_password_hash, verify_password, create_access_token,
@@ -444,7 +445,21 @@ async def update_user(
     
     if user_data.is_active is not None:
         update_params['is_active'] = user_data.is_active
-    
+
+    # Quota fields
+    null_fields = []
+    if user_data.clear_search_limit:
+        null_fields = ['search_limit', 'quota_start_date', 'quota_end_date']
+    else:
+        if user_data.search_limit is not None:
+            update_params['search_limit'] = user_data.search_limit
+        if user_data.quota_start_date is not None:
+            update_params['quota_start_date'] = user_data.quota_start_date
+        if user_data.quota_end_date is not None:
+            update_params['quota_end_date'] = user_data.quota_end_date
+    if null_fields:
+        update_params['_null_fields'] = null_fields
+
     # Hash password if provided
     if user_data.password:
         logger.info(f"Password provided for user {user_id}, hashing it")
@@ -476,9 +491,12 @@ async def update_user(
         is_active=updated_user['is_active'],
         is_admin=updated_user['is_admin'],
         created_at=updated_user['created_at'],
-        last_login=updated_user.get('last_login')
+        last_login=updated_user.get('last_login'),
+        search_limit=updated_user.get('search_limit'),
+        quota_start_date=updated_user.get('quota_start_date'),
+        quota_end_date=updated_user.get('quota_end_date'),
     )
-    
+
     return UserResponse(**updated_user)
 
 
@@ -605,3 +623,27 @@ async def get_my_usage(current_user: TokenData = Depends(get_current_active_user
         "email": current_user.email,
         "total_cost_usd": total_cost
     }
+
+
+@router.get("/my-quota", response_model=QuotaStatusResponse)
+async def get_my_quota(current_user: TokenData = Depends(get_current_active_user)):
+    """
+    Get current user's search quota status and daily breakdown.
+
+    Returns quota limit, searches used, percentage, period dates,
+    and daily breakdown (no cost fields).
+    """
+    data = db_service.get_user_quota_status(current_user.user_id)
+    daily = [QuotaDailyBreakdown(**d) for d in data.get('daily_breakdown', [])]
+    return QuotaStatusResponse(
+        has_limit=data['has_limit'],
+        search_limit=data['search_limit'],
+        quota_start_date=data['quota_start_date'],
+        quota_end_date=data['quota_end_date'],
+        searches_used=data['searches_used'],
+        total_scrapings=data['total_scrapings'],
+        total_analyses=data['total_analyses'],
+        percentage=data['percentage'],
+        period_label=data['period_label'],
+        daily_breakdown=daily,
+    )

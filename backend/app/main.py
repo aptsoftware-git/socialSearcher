@@ -2,7 +2,7 @@
 Main FastAPI application entry point.
 """
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from datetime import datetime, timedelta
@@ -372,7 +372,23 @@ async def social_search(
     """
     try:
         logger.info(f"Social search by user {current_user.email}: '{request.query}' from sites: {request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']}")
-        
+
+        # ----- Quota enforcement -----
+        quota = db_service.get_user_quota_status(current_user.user_id)
+        if quota['has_limit'] and quota['search_limit'] is not None:
+            if quota['searches_used'] >= quota['search_limit']:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"Search limit reached. You have used {quota['searches_used']} / "
+                        f"{quota['search_limit']} searches in your quota period "
+                        f"({quota['period_label']}). Please contact your administrator."
+                    )
+                )
+
+        # Log this search request (one row per request = one quota unit)
+        db_service.log_search_history(current_user.user_id, request.query, 'social')
+
         # Determine which platforms are being searched
         sites = request.sites or ['youtube.com', 'x.com', 'facebook.com', 'instagram.com', 'google.com']
         

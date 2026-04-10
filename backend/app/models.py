@@ -497,6 +497,9 @@ class UserResponse(BaseModel):
     is_admin: bool
     created_at: datetime
     last_login: Optional[datetime] = None
+    search_limit: Optional[int] = None
+    quota_start_date: Optional[date] = None
+    quota_end_date: Optional[date] = None
 
 
 class LoginRequest(BaseModel):
@@ -532,6 +535,10 @@ class UpdateUserRequest(BaseModel):
     profile_image_url: Optional[str] = None
     is_active: Optional[bool] = None
     password: Optional[str] = None  # Optional password for admin reset
+    search_limit: Optional[int] = None
+    quota_start_date: Optional[date] = None
+    quota_end_date: Optional[date] = None
+    clear_search_limit: bool = False  # Set True to remove quota entirely
 
 
 class ChangePasswordRequest(BaseModel):
@@ -557,6 +564,35 @@ class UsageDailyBreakdown(BaseModel):
     scrapecreators_credits: int = 0
     claude_tokens: int = 0
     daily_cost_usd: float = 0.0
+
+
+class QuotaDailyBreakdown(BaseModel):
+    """Daily breakdown for quota details (no cost fields)."""
+    usage_date: date
+    total_searches: int = 0
+    youtube_searches: int = 0
+    twitter_searches: int = 0
+    facebook_searches: int = 0
+    instagram_searches: int = 0
+    google_searches: int = 0
+    total_scrapings: int = 0
+    paid_scrapings: int = 0
+    free_scrapings: int = 0
+    total_analyses: int = 0
+
+
+class QuotaStatusResponse(BaseModel):
+    """Quota status for the current user."""
+    has_limit: bool = False
+    search_limit: Optional[int] = None
+    quota_start_date: Optional[date] = None
+    quota_end_date: Optional[date] = None
+    searches_used: int = 0
+    total_scrapings: int = 0
+    total_analyses: int = 0
+    percentage: float = 0.0
+    period_label: str = ""
+    daily_breakdown: List[QuotaDailyBreakdown] = []
 
 
 class UsageMonthlySummary(BaseModel):

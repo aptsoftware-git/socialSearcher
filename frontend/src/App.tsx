@@ -8,6 +8,7 @@ import SocialResultsPanel from './components/SocialResultsPanel';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import ProfileMenu from './components/ProfileMenu';
+import SearchQuotaBar from './components/SearchQuotaBar';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import { apiService } from './services/api';
@@ -353,6 +354,7 @@ function App() {
             </Typography>
             {user && <ProfileMenu user={user} onUserUpdate={handleUserUpdate} />}
             <LLMConfigDropdown />
+            <SearchQuotaBar token={token!} />
             <Box sx={{ ml: 2 }}>
               <Typography 
                 variant="body2" 

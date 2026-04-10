@@ -55,6 +55,9 @@ interface User {
   is_admin: boolean;
   created_at: string;
   last_login?: string;
+  search_limit?: number | null;
+  quota_start_date?: string | null;
+  quota_end_date?: string | null;
 }
 
 interface UsageReport {
@@ -119,6 +122,9 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
     company: '',
     is_admin: false,
     is_active: true,
+    search_limit: '' as string | number,
+    quota_start_date: '',
+    quota_end_date: '',
   });
 
   // Usage report state
@@ -181,6 +187,9 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
   const handleCreateUser = () => {
     setEditingUser(null);
     const autoPassword = generatePassword();
+    const today = new Date();
+    const nextYear = new Date(today);
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
     setUserForm({
       email: '',
       username: '',
@@ -189,6 +198,9 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
       company: '',
       is_admin: false,
       is_active: true,
+      search_limit: '',
+      quota_start_date: today.toISOString().split('T')[0],
+      quota_end_date: nextYear.toISOString().split('T')[0],
     });
     setShowPassword(false);
     setOpenUserDialog(true);
@@ -204,6 +216,9 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
       company: user.company || '',
       is_admin: user.is_admin,
       is_active: user.is_active,
+      search_limit: user.search_limit != null ? user.search_limit : '',
+      quota_start_date: user.quota_start_date || '',
+      quota_end_date: user.quota_end_date || '',
     });
     setShowPassword(false);
     setOpenUserDialog(true);
@@ -223,6 +238,15 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
           company: userForm.company || null,
           is_active: userForm.is_active,
         };
+
+        // Quota fields
+        if (userForm.search_limit !== '' && userForm.search_limit !== null) {
+          updateData.search_limit = Number(userForm.search_limit);
+        } else {
+          updateData.clear_search_limit = true;
+        }
+        if (userForm.quota_start_date) updateData.quota_start_date = userForm.quota_start_date;
+        if (userForm.quota_end_date) updateData.quota_end_date = userForm.quota_end_date;
         
         // Debug: Show what we're sending
         console.log('Password field value:', userForm.password);
@@ -261,7 +285,12 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(userForm),
+          body: JSON.stringify({
+            ...userForm,
+            search_limit: userForm.search_limit !== '' ? Number(userForm.search_limit) : undefined,
+            quota_start_date: userForm.quota_start_date || undefined,
+            quota_end_date: userForm.quota_end_date || undefined,
+          }),
         });
 
         if (!response.ok) {
@@ -746,6 +775,39 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
               onChange={(e) => setUserForm({ ...userForm, company: e.target.value })}
               margin="normal"
             />
+
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Search Quota (optional)
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  label="Search Limit"
+                  type="number"
+                  value={userForm.search_limit}
+                  onChange={(e) => setUserForm({ ...userForm, search_limit: e.target.value })}
+                  helperText="Leave empty for no limit"
+                  inputProps={{ min: 0 }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Period Start"
+                  type="date"
+                  value={userForm.quota_start_date}
+                  onChange={(e) => setUserForm({ ...userForm, quota_start_date: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Period End"
+                  type="date"
+                  value={userForm.quota_end_date}
+                  onChange={(e) => setUserForm({ ...userForm, quota_end_date: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+            </Box>
 
             {!editingUser && (
               <FormControlLabel
