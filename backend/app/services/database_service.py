@@ -105,11 +105,20 @@ class DatabaseService:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(
                     """
-                    SELECT id, email, username, full_name, company, profile_image_url,
-                           is_active, is_admin, created_at, last_login,
-                           search_limit, quota_start_date, quota_end_date
-                    FROM users 
-                    ORDER BY created_at DESC
+                    SELECT u.id, u.email, u.username, u.full_name, u.company, u.profile_image_url,
+                           u.is_active, u.is_admin, u.created_at, u.last_login,
+                           u.search_limit, u.quota_start_date, u.quota_end_date,
+                           (
+                               SELECT COUNT(*)
+                               FROM user_api_usage ua
+                               WHERE ua.user_id = u.id
+                                 AND ua.api_type = 'search'
+                                 AND ua.platform IN ('youtube', 'twitter', 'facebook', 'instagram', 'google')
+                                 AND (u.quota_start_date IS NULL OR ua.request_timestamp::date >= u.quota_start_date)
+                                 AND (u.quota_end_date   IS NULL OR ua.request_timestamp::date <= u.quota_end_date)
+                           ) AS searches_used
+                    FROM users u
+                    ORDER BY u.created_at DESC
                     """
                 )
                 return cur.fetchall()
@@ -414,7 +423,7 @@ class DatabaseService:
                     return {'has_limit': False, 'searches_used': 0, 'search_limit': None,
                             'quota_start_date': None, 'quota_end_date': None,
                             'total_scrapings': 0, 'total_analyses': 0,
-                            'percentage': 0.0, 'period_label': '', 'daily_breakdown': []}
+                            'percentage': 0.0, 'period_label': '', 'period_expired': False, 'daily_breakdown': []}
 
                 search_limit = user['search_limit']
                 start_date = user['quota_start_date']
@@ -525,6 +534,9 @@ class DatabaseService:
                 if start_date and end_date:
                     period_label = f"{start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}"
 
+                from datetime import date as _date
+                period_expired = (end_date is not None and _date.today() > end_date)
+
                 return {
                     'has_limit': search_limit is not None,
                     'search_limit': search_limit,
@@ -535,6 +547,7 @@ class DatabaseService:
                     'total_analyses': int(totals['total_analyses']),
                     'percentage': percentage,
                     'period_label': period_label,
+                    'period_expired': period_expired,
                     'daily_breakdown': daily,
                 }
         except Exception as e:
@@ -542,7 +555,7 @@ class DatabaseService:
             return {'has_limit': False, 'searches_used': 0, 'search_limit': None,
                     'quota_start_date': None, 'quota_end_date': None,
                     'total_scrapings': 0, 'total_analyses': 0,
-                    'percentage': 0.0, 'period_label': '', 'daily_breakdown': []}
+                    'percentage': 0.0, 'period_label': '', 'period_expired': False, 'daily_breakdown': []}
         finally:
             if conn:
                 self.return_connection(conn)

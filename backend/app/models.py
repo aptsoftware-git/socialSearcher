@@ -500,6 +500,7 @@ class UserResponse(BaseModel):
     search_limit: Optional[int] = None
     quota_start_date: Optional[date] = None
     quota_end_date: Optional[date] = None
+    searches_used: Optional[int] = None
 
 
 class LoginRequest(BaseModel):
@@ -592,6 +593,7 @@ class QuotaStatusResponse(BaseModel):
     total_analyses: int = 0
     percentage: float = 0.0
     period_label: str = ""
+    period_expired: bool = False
     daily_breakdown: List[QuotaDailyBreakdown] = []
 
 

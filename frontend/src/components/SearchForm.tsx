@@ -421,7 +421,7 @@ const SearchForm: React.FC<SearchFormProps> = ({
           </Typography>
         
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          <Alert severity="error" sx={{ mb: 2, backgroundColor: '#ef9a9a', color: '#7f0000', border: '1px solid #c62828', '& .MuiAlert-icon': { color: '#b71c1c' } }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}

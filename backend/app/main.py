@@ -376,6 +376,17 @@ async def social_search(
         # ----- Quota enforcement -----
         quota = db_service.get_user_quota_status(current_user.user_id)
         if quota['has_limit'] and quota['search_limit'] is not None:
+            from datetime import date as _date
+            end_date = quota.get('quota_end_date')
+            period_expired = end_date is not None and _date.today() > end_date
+            if period_expired:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"Your quota period has expired ({quota['period_label']}). "
+                        f"Please contact your administrator to renew your quota period."
+                    )
+                )
             if quota['searches_used'] >= quota['search_limit']:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,

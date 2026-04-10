@@ -645,5 +645,6 @@ async def get_my_quota(current_user: TokenData = Depends(get_current_active_user
         total_analyses=data['total_analyses'],
         percentage=data['percentage'],
         period_label=data['period_label'],
+        period_expired=data['period_expired'],
         daily_breakdown=daily,
     )

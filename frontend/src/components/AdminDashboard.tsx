@@ -58,6 +58,7 @@ interface User {
   search_limit?: number | null;
   quota_start_date?: string | null;
   quota_end_date?: string | null;
+  searches_used?: number | null;
 }
 
 interface UsageReport {
@@ -441,6 +442,8 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
                   <TableCell>Company</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Status</TableCell>
+                  <TableCell>Search Usage</TableCell>
+                  <TableCell>Quota Period</TableCell>
                   <TableCell>Last Login</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -474,6 +477,31 @@ const AdminDashboard = ({ token, onLogout }: AdminDashboardProps) => {
                         color={user.is_active ? 'success' : 'default'}
                         size="small"
                       />
+                    </TableCell>
+                    <TableCell>
+                      {user.search_limit != null ? (
+                        (() => {
+                          const used = user.searches_used ?? 0;
+                          const limit = user.search_limit!;
+                          const pct = Math.min(100, Math.round(used / limit * 100));
+                          const color = pct >= 100 ? 'error' : pct >= 80 ? 'warning' : 'success';
+                          return (
+                            <Box sx={{ minWidth: 90 }}>
+                              <Typography variant="body2">{used} / {limit}</Typography>
+                              <Box sx={{ mt: 0.5, height: 4, borderRadius: 2, backgroundColor: 'action.hover', overflow: 'hidden' }}>
+                                <Box sx={{ width: `${pct}%`, height: '100%', borderRadius: 2, backgroundColor: `${color}.main` }} />
+                              </Box>
+                            </Box>
+                          );
+                        })()
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                      {user.quota_start_date && user.quota_end_date ? (
+                        <Typography variant="body2">
+                          {formatDate(user.quota_start_date)}<br />{formatDate(user.quota_end_date)}
+                        </Typography>
+                      ) : '—'}
                     </TableCell>
                     <TableCell>
                       {user.last_login ? formatDate(user.last_login) : 'Never'}

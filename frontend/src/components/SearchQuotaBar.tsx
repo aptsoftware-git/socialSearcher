@@ -8,6 +8,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Popover,
+  Divider,
   Paper,
   Stack,
   Table,
@@ -20,11 +22,9 @@ import {
   Tooltip,
 } from '@mui/material';
 import {
-  Info as InfoIcon,
-  Refresh as RefreshIcon,
-  Warning as WarningIcon,
-  Block as BlockIcon,
+  DataUsage as DataUsageIcon,
 } from '@mui/icons-material';
+import Badge from '@mui/material/Badge';
 
 interface QuotaDailyBreakdown {
   usage_date: string;
@@ -50,6 +50,7 @@ interface QuotaStatus {
   total_analyses: number;
   percentage: number;
   period_label: string;
+  period_expired: boolean;
   daily_breakdown: QuotaDailyBreakdown[];
 }
 
@@ -61,12 +62,10 @@ interface SearchQuotaBarProps {
 
 const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [popoverAnchor, setPopoverAnchor] = useState<HTMLElement | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-
   const fetchQuota = useCallback(async () => {
     try {
-      setLoading(true);
       const response = await fetch('/api/v1/auth/my-quota', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -77,13 +76,11 @@ const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
         onQuotaExceeded(
           data.has_limit &&
             data.search_limit !== null &&
-            data.searches_used >= data.search_limit
+            (data.searches_used >= data.search_limit || data.period_expired)
         );
       }
     } catch {
       // silently ignore quota fetch errors
-    } finally {
-      setLoading(false);
     }
   }, [token, onQuotaExceeded]);
 
@@ -94,7 +91,7 @@ const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
   // Don't render if no limit is set
   if (!quota || !quota.has_limit || quota.search_limit === null) return null;
 
-  const exceeded = quota.searches_used >= quota.search_limit;
+  const exceeded = quota.searches_used >= quota.search_limit || quota.period_expired;
   const nearLimit = quota.percentage >= 80 && !exceeded;
 
   const barColor = exceeded ? 'error' : nearLimit ? 'warning' : 'primary';
@@ -118,97 +115,90 @@ const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
     {} as Partial<QuotaDailyBreakdown>
   );
 
+  const openPopover = (e: React.MouseEvent<HTMLElement>) => {
+    setPopoverAnchor(e.currentTarget);
+    fetchQuota();
+  };
+
   return (
     <>
-      {/* Compact inline element for inside the AppBar Toolbar */}
-      <Box
-        sx={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          ml: 2,
-          mr: 1,
-          px: 1.5,
-          py: 0.5,
-          borderRadius: 2,
-          backgroundColor: exceeded
-            ? 'rgba(211,47,47,0.25)'
-            : nearLimit
-            ? 'rgba(237,108,2,0.25)'
-            : 'rgba(255,255,255,0.15)',
-          border: 1,
-          borderColor: exceeded
-            ? 'error.light'
-            : nearLimit
-            ? 'warning.light'
-            : 'rgba(255,255,255,0.3)',
-          minWidth: 220,
-        }}
-      >
-        {exceeded ? (
-          <BlockIcon sx={{ color: '#ffcdd2', fontSize: 16 }} />
-        ) : nearLimit ? (
-          <WarningIcon sx={{ color: '#ffe0b2', fontSize: 16 }} />
-        ) : null}
-
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="caption"
-            sx={{
-              color: exceeded ? '#ffcdd2' : nearLimit ? '#ffe0b2' : 'rgba(255,255,255,0.9)',
-              display: 'block',
-              lineHeight: 1.2,
-              fontWeight: exceeded || nearLimit ? 'bold' : 'normal',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
+      {/* Toolbar icon */}
+      <Tooltip title="Search Usage">
+        <IconButton
+          size="small"
+          onClick={openPopover}
+          sx={{
+            color: exceeded ? '#ffcdd2' : nearLimit ? '#ffe0b2' : 'rgba(255,255,255,0.9)',
+            mx: 0.5,
+          }}
+        >
+          <Badge
+            variant="dot"
+            color={exceeded ? 'error' : 'warning'}
+            invisible={!exceeded && !nearLimit}
           >
-            Searches: {quota.searches_used} / {quota.search_limit}
+            <DataUsageIcon fontSize="small" />
+          </Badge>
+        </IconButton>
+      </Tooltip>
+
+      {/* Popover — progress bar + summary */}
+      <Popover
+        open={Boolean(popoverAnchor)}
+        anchorEl={popoverAnchor}
+        onClose={() => setPopoverAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        PaperProps={{ sx: { p: 2.5, minWidth: 320, maxWidth: 380 } }}
+      >
+        {/* Header */}
+        <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 0.5 }}>Search Usage</Typography>
+
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+          {quota.period_label || `${formatDate(quota.quota_start_date)} – ${formatDate(quota.quota_end_date)}`}
+        </Typography>
+
+        {/* Progress bar */}
+        <LinearProgress
+          variant="determinate"
+          value={Math.min(100, quota.percentage)}
+          color={barColor}
+          sx={{ height: 10, borderRadius: 5, mb: 1, backgroundColor: 'rgba(0,0,0,0.08)' }}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="body2" color={exceeded ? 'error.main' : 'text.secondary'}>
+            {quota.searches_used} / {quota.search_limit} searches
           </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(100, quota.percentage)}
-            color={barColor}
-            sx={{
-              height: 4,
-              borderRadius: 2,
-              mt: 0.25,
-              backgroundColor: 'rgba(255,255,255,0.2)',
-              '& .MuiLinearProgress-bar': {
-                backgroundColor: exceeded ? '#ef9a9a' : nearLimit ? '#ffcc02' : '#90caf9',
-              },
-            }}
-          />
+          <Typography variant="body2" fontWeight="bold" color={exceeded ? 'error.main' : nearLimit ? 'warning.main' : 'success.main'}>
+            {quota.percentage}%
+          </Typography>
         </Box>
 
-        <Tooltip title="View usage details">
-          <Button
-            size="small"
-            variant="text"
-            onClick={() => setDetailsOpen(true)}
-            startIcon={<InfoIcon sx={{ fontSize: '14px !important' }} />}
-            sx={{
-              color: 'rgba(255,255,255,0.85)',
-              fontSize: '0.7rem',
-              minWidth: 'auto',
-              px: 0.75,
-              py: 0.25,
-              '&:hover': { backgroundColor: 'rgba(255,255,255,0.15)' },
-            }}
-          >
-            Details
-          </Button>
-        </Tooltip>
+        {/* Exceeded warning */}
+        {exceeded && (
+          <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#ffcdd2', borderRadius: 1, border: 1, borderColor: '#e57373' }}>
+            <Typography variant="caption" color="error.dark" fontWeight="medium">
+              {quota.period_expired
+                ? `Quota period expired (${quota.period_label}). Contact admin to renew.`
+                : 'Search quota exhausted. Contact admin to increase your limit.'}
+            </Typography>
+          </Box>
+        )}
 
-        <Tooltip title="Refresh">
-          <IconButton size="small" onClick={fetchQuota} disabled={loading} sx={{ color: 'rgba(255,255,255,0.7)', p: 0.25 }}>
-            <RefreshIcon sx={{ fontSize: 14 }} />
-          </IconButton>
-        </Tooltip>
-      </Box>
+        <Divider sx={{ mb: 1.5 }} />
 
-      {/* Details dialog */}
+        {/* Details button */}
+        <Button
+          fullWidth
+          variant="outlined"
+          size="small"
+          onClick={() => { setPopoverAnchor(null); setDetailsOpen(true); }}
+        >
+          Details
+        </Button>
+      </Popover>
+
+      {/* Dialog — full daily breakdown table */}
       <Dialog
         open={detailsOpen}
         onClose={() => setDetailsOpen(false)}
@@ -223,74 +213,47 @@ const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
               Quota Period
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              {quota.period_label
-                ? quota.period_label
-                : `${formatDate(quota.quota_start_date)} – ${formatDate(quota.quota_end_date)}`}
+              {quota.period_label || `${formatDate(quota.quota_start_date)} – ${formatDate(quota.quota_end_date)}`}
             </Typography>
 
-            <Stack direction="row" spacing={3} flexWrap="wrap">
+            <Stack direction="row" spacing={3} flexWrap="wrap" sx={{ mb: 2 }}>
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Searches Used
-                </Typography>
-                <Typography
-                  variant="h5"
-                  fontWeight="bold"
-                  color={exceeded ? 'error.main' : nearLimit ? 'warning.main' : 'text.primary'}
-                >
+                <Typography variant="caption" color="text.secondary">Searches Used</Typography>
+                <Typography variant="h5" fontWeight="bold" color={exceeded ? 'error.main' : nearLimit ? 'warning.main' : 'text.primary'}>
                   {quota.searches_used}
-                  <Box component="span" sx={{ fontSize: '0.6em', fontWeight: 'normal', color: 'text.secondary', ml: 0.5 }}>
-                    / {quota.search_limit}
-                  </Box>
+                  <Box component="span" sx={{ fontSize: '0.6em', fontWeight: 'normal', color: 'text.secondary', ml: 0.5 }}>/ {quota.search_limit}</Box>
                 </Typography>
               </Box>
-
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Total Scrapings
-                </Typography>
-                <Typography variant="h5" fontWeight="bold">
-                  {quota.total_scrapings}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Total Scrapings</Typography>
+                <Typography variant="h5" fontWeight="bold">{quota.total_scrapings}</Typography>
               </Box>
-
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Total Analyses
-                </Typography>
-                <Typography variant="h5" fontWeight="bold">
-                  {quota.total_analyses}
-                </Typography>
+                <Typography variant="caption" color="text.secondary">Total Analyses</Typography>
+                <Typography variant="h5" fontWeight="bold">{quota.total_analyses}</Typography>
               </Box>
-
               <Box>
-                <Typography variant="caption" color="text.secondary">
-                  Usage
-                </Typography>
-                <Typography
-                  variant="h5"
-                  fontWeight="bold"
-                  color={exceeded ? 'error.main' : nearLimit ? 'warning.main' : 'success.main'}
-                >
+                <Typography variant="caption" color="text.secondary">Usage</Typography>
+                <Typography variant="h5" fontWeight="bold" color={exceeded ? 'error.main' : nearLimit ? 'warning.main' : 'success.main'}>
                   {quota.percentage}%
                 </Typography>
               </Box>
             </Stack>
 
+            <LinearProgress
+              variant="determinate"
+              value={Math.min(100, quota.percentage)}
+              color={barColor}
+              sx={{ height: 8, borderRadius: 4, mb: 1, backgroundColor: 'rgba(0,0,0,0.08)' }}
+            />
+            <Typography variant="caption" color="text.secondary">{quota.percentage}% used</Typography>
+
             {exceeded && (
-              <Box
-                sx={{
-                  mt: 2,
-                  p: 1.5,
-                  backgroundColor: 'error.lighter',
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: 'error.light',
-                }}
-              >
+              <Box sx={{ mt: 2, p: 1.5, backgroundColor: '#ffcdd2', borderRadius: 1, border: 1, borderColor: '#e57373' }}>
                 <Typography variant="body2" color="error.dark" fontWeight="medium">
-                  Your search quota has been exhausted. Please contact your administrator to
-                  increase your limit or extend your quota period.
+                  {quota.period_expired
+                    ? `Your quota period has expired (${quota.period_label}). Please contact your administrator to renew your quota period.`
+                    : 'Your search quota has been exhausted. Please contact your administrator to increase your limit or extend your quota period.'}
                 </Typography>
               </Box>
             )}
@@ -356,7 +319,7 @@ const SearchQuotaBar = ({ token, onQuotaExceeded }: SearchQuotaBarProps) => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDetailsOpen(false)}>Close</Button>
+          <Button onClick={() => setDetailsOpen(false)} variant="contained">Close</Button>
         </DialogActions>
       </Dialog>
     </>
