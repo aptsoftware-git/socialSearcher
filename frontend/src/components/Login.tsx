@@ -20,7 +20,7 @@ import {
   Visibility,
   VisibilityOff,
 } from '@mui/icons-material';
-import logoImage from '../assets/defenderosint.webp';
+import logoImage from '../assets/aptvigilosint.webp';
 import makeInIndiaLogo from '../assets/Make_In_India.png';
 
 interface LoginProps {
@@ -84,7 +84,7 @@ const Login = ({ onLoginSuccess }: LoginProps) => {
             sx={{ height: 52, mr: 2 }}
           />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            <Box component="span" sx={{ fontWeight: 'bold' }}>Tiger OSINT</Box> - AI based customized web scrapper
+            <Box component="span" sx={{ fontWeight: 'bold' }}>Apt Vigil</Box> - AI based customized web scrapper
           </Typography>
         </Toolbar>
       </AppBar>

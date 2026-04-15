@@ -12,7 +12,7 @@ import SearchQuotaBar from './components/SearchQuotaBar';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import { apiService } from './services/api';
-import logoImage from './assets/defenderosint.webp';
+import logoImage from './assets/aptvigilosint.webp';
 import makeInIndiaLogo from './assets/Make_In_India.png';
 import './App.css';
 
@@ -347,7 +347,7 @@ function App() {
               sx={{ height: 52, mr: 2 }}
             />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              <Box component="span" sx={{ fontWeight: 'bold' }}>Tiger OSINT</Box> - AI based customized web scrapper
+              <Box component="span" sx={{ fontWeight: 'bold' }}>Apt Vigil</Box> - AI based customized web scrapper
             </Typography>
             <Typography variant="body2" sx={{ mr: 1 }}>
               {getDisplayName()}

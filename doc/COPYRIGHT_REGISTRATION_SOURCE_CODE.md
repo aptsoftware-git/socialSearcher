@@ -1104,7 +1104,7 @@ import ProfileMenu from './components/ProfileMenu';
 import { EventData, ProgressUpdate, SocialSearchResult } from './types/events';
 import { streamService } from './services/streamService';
 import { apiService } from './services/api';
-import logoImage from './assets/defenderosint.webp';
+import logoImage from './assets/aptvigilosint.webp';
 import makeInIndiaLogo from './assets/Make_In_India.png';
 import './App.css';
 
