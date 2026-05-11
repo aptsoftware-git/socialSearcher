@@ -11,21 +11,20 @@ NGINX_CONTAINER="socialSearcher_nginx"
 
 echo "$(date): Checking certificate renewal for ${DOMAIN}" >> "$LOG_FILE"
 
-# Stop nginx to free port 80 for standalone challenge
-docker stop "$NGINX_CONTAINER" >> "$LOG_FILE" 2>&1
-
-# Attempt renewal (certbot skips if cert is not yet within 30 days of expiry)
-if certbot renew --quiet >> "$LOG_FILE" 2>&1; then
+# Renew using webroot - nginx stays running, no downtime needed.
+# Certbot writes challenge files to the host path, which is bind-mounted
+# into the nginx container at /var/www/certbot.
+WEBROOT="/home/ubuntu/socialSearcher/nginx/certbot"
+if certbot renew --quiet --webroot -w "$WEBROOT" >> "$LOG_FILE" 2>&1; then
     # Copy renewed cert and key to nginx ssl directory
     cp "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" "${SSL_DIR}/cert.pem"
     cp "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"   "${SSL_DIR}/key.pem"
     chown ubuntu:ubuntu "${SSL_DIR}/cert.pem" "${SSL_DIR}/key.pem"
-    echo "$(date): Certificate renewed and deployed successfully." >> "$LOG_FILE"
+    # Reload nginx gracefully (no stop/start needed)
+    docker exec "$NGINX_CONTAINER" nginx -s reload >> "$LOG_FILE" 2>&1
+    echo "$(date): Certificate renewed and nginx reloaded successfully." >> "$LOG_FILE"
 else
-    echo "$(date): Certificate renewal failed." >> "$LOG_FILE"
+    echo "$(date): Certificate renewal failed or not yet due." >> "$LOG_FILE"
 fi
 
-# Always restart nginx regardless of renewal outcome
-docker start "$NGINX_CONTAINER" >> "$LOG_FILE" 2>&1
-
-echo "$(date): nginx restarted." >> "$LOG_FILE"
+echo "$(date): Renewal check complete." >> "$LOG_FILE"
